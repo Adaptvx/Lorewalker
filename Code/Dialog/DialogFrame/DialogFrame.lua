@@ -7,6 +7,7 @@ local Sound = env.modules:Import("packages\\sound")
 local UIKit = env.modules:Import("packages\\ui-kit")
 local UIAnim = env.modules:Import("packages\\ui-anim")
 local InputUtil = env.modules:Import("@\\InputUtil")
+local SharedUtil = env.modules:Import("@\\Dialog\\SharedUtil")
 local Modes_ModeHandler = env.modules:Await("@\\Dialog\\Modes\\ModeHandler")
 local Settings = env.modules:Await("@\\Settings")
 local PlayerMovementFrameFader = env.modules:Import("@\\PlayerMovementFrameFader")
@@ -41,6 +42,8 @@ local GOSSIP_SELECTION_GROUPS = {
 }
 local QUEST_SELECTION_GROUPS = {
     { group = "QuestSpellObjective",         list = "SpellRewardListFrame" },
+    { group = "QuestRequiredItems",          list = "RewardListFrame" },
+    { group = "QuestRequiredCurrencies",     list = "RewardListFrame" },
     { group = "QuestItemRewards",            list = "RewardListFrame" },
     { group = "QuestItemChoiceRewards",      list = "RewardListFrame" },
     { group = "QuestSpellRewards",           list = "SpellRewardListFrame" },
@@ -105,6 +108,7 @@ local function CreateSettingsMenu(_, rootDescription)
     local modeMenu = rootDescription:CreateButton(L["DIALOG_SETTINGS_MODE"])
     modeMenu:CreateRadio(L["CONFIG_DIALOGUE_MODE_CLASSIC"], SettingsMenu_IsModeSelected, SettingsMenu_SetMode, env.Enum.Mode.Classic)
     modeMenu:CreateRadio(L["CONFIG_DIALOGUE_MODE_IMMERSIVE"], SettingsMenu_IsModeSelected, SettingsMenu_SetMode, env.Enum.Mode.Immersive)
+    -- modeMenu:CreateRadio(L["CONFIG_DIALOGUE_MODE_STORY"], SettingsMenu_IsModeSelected, SettingsMenu_SetMode, env.Enum.Mode.Story)
 end
 
 function DialogFrameMixin:OpenSettingsMenu()
@@ -123,16 +127,7 @@ function DialogFrameMixin:OnLoad()
     self.maxWidth = 592
     self.maxHeight = self.maxWidth * self.forcedAspectRatio
 
-    self.TitleContainer:SetScript("OnDragStart", function()
-        SetCursor("Interface\\Cursor\\UI-Cursor-Move")
-        self:StartMoving()
-    end)
-
-    self.TitleContainer:SetScript("OnDragStop", function()
-        ResetCursor()
-        self:StopMovingOrSizing()
-        self:SavePositionAndDimensions()
-    end)
+    SharedUtil.InitializeBoundsForFrame(self, "dialogFrameBounds", self.TitleContainer, 3, self.GetDefaultSize)
 
     self.TitleContainer.CloseButton:HookClick(function()
         self:CloseSession()
@@ -201,7 +196,7 @@ function DialogFrameMixin:UpdateDialogGlyph()
     local isGossip = ControlCenter.GetGossipSessionType()
     local hasGossipContent = self.GossipFrame.GossipText:IsShown() or self.GossipFrame.GossipAvailableQuests:IsShown() or self.GossipFrame.GossipActiveQuests:IsShown() or self.GossipFrame.GossipOptions:IsShown()
     local isQuest = ControlCenter.GetQuestSessionType()
-    local hasQuestContent = self.QuestFrame.QuestText:IsShown() or self.QuestFrame.QuestObjectivesHeader:IsShown() or self.QuestFrame.QuestSpellObjectiveHeader:IsShown() or self.QuestFrame.QuestRewardsHeader:IsShown()
+    local hasQuestContent = self.QuestFrame.QuestText:IsShown() or self.QuestFrame.QuestObjectivesHeader:IsShown() or self.QuestFrame.QuestSpellObjectiveHeader:IsShown() or self.QuestFrame.QuestRequiredItemsHeader:IsShown() or self.QuestFrame.QuestRewardsHeader:IsShown()
 
     self:SetDialogGlyphVisibility(isGossip and not hasGossipContent, isQuest and not self.showDefaultText and not hasQuestContent)
 end
@@ -382,41 +377,33 @@ function DialogFrameMixin:UpdateSelectableElementState(previousElement, nextElem
 end
 
 function DialogFrameMixin:RestorePositionAndDimensions()
-    local bounds = Config.DBGlobal:GetVariable("dialogFrameBounds")
-
-    if bounds and bounds.width and bounds.height then
-        self:SetSize(bounds.width, bounds.height)
-    end
-
-    if not bounds or not bounds.point or not bounds.x or not bounds.y then
-        self:SetDefaultPosition()
-    else
-        self:ClearAllPoints()
-        self:SetPoint(bounds.point, UIParent, bounds.x, bounds.y)
-    end
-
+    SharedUtil.RestoreBounds(self)
     self:_Render()
 end
 
-function DialogFrameMixin:SavePositionAndDimensions()
-    local point, _, _, x, y = self:GetPoint()
-    local width, height = self:GetSize()
-
-    Config.DBGlobal:SetVariable({ "dialogFrameBounds", "point" }, point)
-    Config.DBGlobal:SetVariable({ "dialogFrameBounds", "x" }, x)
-    Config.DBGlobal:SetVariable({ "dialogFrameBounds", "y" }, y)
-    Config.DBGlobal:SetVariable({ "dialogFrameBounds", "width" }, width)
-    Config.DBGlobal:SetVariable({ "dialogFrameBounds", "height" }, height)
-end
-
-function DialogFrameMixin:SetDefaultPosition()
+function DialogFrameMixin:GetDefaultPosition(index)
     local screenWidth = UIParent:GetWidth()
     local screenHeight = UIParent:GetHeight()
-    local defaultX = (screenWidth / 4) - (LWDialogFrame:GetWidth() / 2)
-    local defaultY = (screenHeight / 2) - (LWDialogFrame:GetHeight() / 2)
+    local width, height = self:GetSize()
+    local defaultX = (screenWidth / 4) - (width / 2)
+    local defaultY = (screenHeight / 2) - (height / 2)
 
+    if index == 2 then
+        defaultX = (screenWidth * 3 / 4) - (width / 2)
+    elseif index == 3 then
+        defaultX = (screenWidth / 2) - (width / 2)
+    end
+    return "TOPLEFT", UIParent, "TOPLEFT", defaultX, -defaultY
+end
+
+function DialogFrameMixin:GetDefaultSize()
+    return self.minWidth, self.minHeight
+end
+
+function DialogFrameMixin:SetDefaultPosition(index)
+    local point, relativeTo, relativePoint, x, y = self:GetDefaultPosition(index)
     self:ClearAllPoints()
-    self:SetPoint("TOPLEFT", UIParent, defaultX, -defaultY)
+    self:SetPoint(point, relativeTo, relativePoint, x, y)
 end
 
 function DialogFrameMixin:ShowSelectionHighlight()
@@ -430,19 +417,17 @@ function DialogFrameMixin:HideSelectionHighlight()
 end
 
 function DialogFrameMixin:StartResizing()
-    self:ShowSelectionHighlight()
-
-    self.isResizing = true
-    self:StartSizing()
+    if SharedUtil.StartResizing(self) then
+        self:ShowSelectionHighlight()
+    end
 end
 
 function DialogFrameMixin:StopResizing()
+    if not self.isResizing then return end
     self:HideSelectionHighlight()
     self:RefreshEdgeFade()
 
-    self.isResizing = false
-    self:StopMovingOrSizing()
-    self:SavePositionAndDimensions()
+    SharedUtil.StopResizing(self)
 
     if self:IsShown() then
         self:_Render()
@@ -727,7 +712,9 @@ do --Quest
         local SpellHeaderPool = Pool.New(function(pool) return { uk_poolElementType = "HEADER", text = nil, isPrimary = false } end)
 
         local function SortSpellRewards(a, b)
-            return QUEST_SPELL_TYPE_PRIORITY[a.spellType] < QUEST_SPELL_TYPE_PRIORITY[b.spellType]
+            local priorityA = QUEST_SPELL_TYPE_PRIORITY[a.spellType] or math.huge
+            local priorityB = QUEST_SPELL_TYPE_PRIORITY[b.spellType] or math.huge
+            return priorityA < priorityB
         end
 
         function DialogFrameMixin:FormatSpellRewards(spellRewards)
@@ -777,22 +764,19 @@ do --Quest
     end
 
     function DialogFrameMixin:RefreshQuestFrame()
+        local questSessionType = ControlCenter.GetQuestSessionType()
         self:UpdateQuestTitle()
         self:UpdateQuestText()
-        if ControlCenter.GetQuestSessionType() == ControlCenter_Preload.Enum.SessionType.Progress then
-            if ControlCenter.IsQuestComplete() then
-                self:UpdateQuestObjectives(false)
-            else
-                self:UpdateQuestObjectives(true)
-            end
-            self:UpdateQuestRewards(false)
-        elseif ControlCenter.GetQuestSessionType() == ControlCenter_Preload.Enum.SessionType.Complete then
+        if questSessionType == ControlCenter_Preload.Enum.SessionType.Progress then
+            self:UpdateQuestObjectives(not ControlCenter.CanContinueQuest())
+        elseif questSessionType == ControlCenter_Preload.Enum.SessionType.Complete then
             self:UpdateQuestObjectives(false)
-            self:UpdateQuestRewards(true)
-        elseif ControlCenter.GetQuestSessionType() == ControlCenter_Preload.Enum.SessionType.Detail then
+        elseif questSessionType == ControlCenter_Preload.Enum.SessionType.Detail then
             self:UpdateQuestObjectives(true)
-            self:UpdateQuestRewards(true)
         end
+        self:UpdateQuestRequiredItems(questSessionType == ControlCenter_Preload.Enum.SessionType.Progress)
+        self:UpdateQuestRewards(questSessionType == ControlCenter_Preload.Enum.SessionType.Complete or questSessionType == ControlCenter_Preload.Enum.SessionType.Detail)
+        self:UpdateFooterButtons()
         self:UpdateDialogGlyph()
     end
 
@@ -853,8 +837,28 @@ do --Quest
         self.QuestFrame.QuestSpellObjective:SetShown(showSpellObjective)
     end
 
+    function DialogFrameMixin:UpdateQuestRequiredItems(show)
+        local items = ControlCenter.GetQuestRequired()
+        local currencies = ControlCenter.GetQuestRequiredCurrencies()
+        local showItems = show and items and #items > 0
+        local showCurrencies = show and currencies and #currencies > 0
+        local showCategory = showItems or showCurrencies
+
+        if showItems then
+            self.QuestFrame.QuestRequiredItems:SetData(items)
+        end
+        if showCurrencies then
+            self.QuestFrame.QuestRequiredCurrencies:SetData(currencies)
+        end
+
+        self.QuestFrame.QuestRequiredItemsSpacer:SetShown(showCategory and (self.QuestFrame.QuestText:IsShown() or self.QuestFrame.QuestObjectivesHeader:IsShown() or self.QuestFrame.QuestSpellObjectiveHeader:IsShown()))
+        self.QuestFrame.QuestRequiredItemsHeader:SetShown(showCategory)
+        self.QuestFrame.QuestRequiredItems:SetShown(showItems)
+        self.QuestFrame.QuestRequiredCurrencies:SetShown(showCurrencies)
+    end
+
     function DialogFrameMixin:UpdateQuestRewards(show)
-        local isQuestComplete = ControlCenter.IsQuestComplete()
+        local isQuestComplete = ControlCenter.GetQuestSessionType() == ControlCenter_Preload.Enum.SessionType.Complete
         local showCategory, showChoice, showSpell, showReceiveHeader, showReceiveItem, showReceiveCurrency, showReceiveSkill, showOtherExperience, showOtherMoney, showOtherHonor
 
         if show then
@@ -1161,7 +1165,7 @@ do --Footer
                     ApplyLayout(LAYOUTS.QuestAvailable)
                 end
             elseif questSessionType == ControlCenter_Preload.Enum.SessionType.Progress then
-                if ControlCenter.IsQuestComplete() then
+                if ControlCenter.CanContinueQuest() then
                     ApplyLayout(LAYOUTS.QuestIncompleteContinue)
                 else
                     ApplyLayout(LAYOUTS.QuestIncomplete)

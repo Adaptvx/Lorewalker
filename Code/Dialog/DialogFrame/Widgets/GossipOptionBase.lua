@@ -45,8 +45,8 @@ do -- Option
     end
 
     function OptionMixin:SetTrivial(isTrivial)
-        self.IconTexture:SetAlpha(isTrivial and 0.5 or 1)
-        self.Label:SetAlpha(isTrivial and 0.5 or 1)
+        self.IconTexture:SetAlpha(isTrivial and 0.75 or 1)
+        self.Label:SetAlpha(isTrivial and 0.75 or 1)
     end
 
     function OptionMixin:UpdateAnimation()
@@ -89,11 +89,12 @@ do -- Group
         self.OptionListFrame:SetData(data)
     end
 
-    function GossipOptionBase.OnOptionUpdate(element, index, value)
+    function GossipOptionBase.OnOptionUpdate(element, index, value, alternate)
         local optionIndex = value.dialogOptionIndex
         local showOptionIndex = optionIndex and InputUtil.GetInputDevice() == InputUtil.Enum.InputDevices.KBM
-        
-        element:SetText((showOptionIndex and optionIndex .. ". " or "") .. value.name)
+        local name = alternate and value.alternateName or value.name
+
+        element:SetText((showOptionIndex and optionIndex .. ". " or "") .. name)
         element:SetImage(value.contextIcon or value.icon)
         element:SetTrivial(value.questInfo and value.questInfo.questIsTrivial)
         element:SetPushed(false)

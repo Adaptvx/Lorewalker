@@ -80,8 +80,9 @@ local BACKGROUND_LOOKUP = {
 }
 
 function DialogFrame_Preload:SetBackground(backgroundTextureObject)
-    local background = BACKGROUND_LOOKUP[Config.DBGlobal:GetVariable("Theme") == env.Enum.Theme.Dark and "Dark" or "Classic"]
-    local questBackground = ControlCenter.GetQuestSessionType() and ControlCenter.GetQuestBackground()
+    local isDark = Config.DBGlobal:GetVariable("Theme") == env.Enum.Theme.Dark
+    local background = BACKGROUND_LOOKUP[isDark and "Dark" or "Classic"]
+    local questBackground = not isDark and ControlCenter.GetQuestSessionType() and ControlCenter.GetQuestBackground()
     if questBackground then
         background = BACKGROUND_LOOKUP[questBackground.background] or background
     end

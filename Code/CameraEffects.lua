@@ -6,11 +6,13 @@ local SavedVariables = env.modules:Import("packages\\saved-variables")
 local UIKit = env.modules:Import("packages\\ui-kit")
 local Frame, LayoutGrid, LayoutHorizontal, LayoutVertical, Text, ScrollContainer, LazyScrollContainer, ScrollBar, ScrollContainerEdge, Input, LinearSlider, HitRect, List, SecureButton, ModelScene = unpack(UIKit.UI.Frames)
 local CVarUtil = env.modules:Import("packages\\cvar-util")
+local LazyTimer = env.modules:Import("packages\\lazy-timer")
 local UIAnim = env.modules:Import("packages\\ui-anim")
 local CameraEffects = env.modules:New("@\\CameraEffects")
 
-local UIParent = UIParent
+local GetGlidingInfo = C_PlayerInfo and C_PlayerInfo.GetGlidingInfo
 local GetCameraZoom = GetCameraZoom
+local GetShapeshiftForm = GetShapeshiftForm
 local CameraZoomIn = CameraZoomIn
 local CameraZoomOut = CameraZoomOut
 local ConsoleExec = ConsoleExec
@@ -23,6 +25,7 @@ local next = next
 local wipe = wipe
 local type = type
 local min = math.min
+local abs = math.abs
 
 
 do --Vignette
@@ -66,6 +69,7 @@ end
 local MIN_TICK = 0.016
 local SHOULDER_OFFSET_TICK = 0.1
 local DEFAULT_SHOULDER_OFFSET_ZOOM = 39
+local HORIZONTAL_CENTER_THRESHOLD = 200
 
 local DefaultShoulderOffsetDef = {
     BeginDuration = 2.5,
@@ -143,6 +147,10 @@ if GameEvent and GameEvent.UnregisterInternalEvent then GameEvent.UnregisterInte
 CVarUtil.SetCVar(CameraEffects.Enum.Effects.CameraKeepCharacterCentered, false, CVarUtil.Enum.TemporaryType.UntilLogout)
 CVarUtil.SetCVar(CameraEffects.Enum.Effects.CameraReduceUnexpectedMovement, false, CVarUtil.Enum.TemporaryType.UntilLogout)
 
+--Fix invalid camera view preventing shoulder offset from working
+local validCameraViews = { [1] = true, [2] = true, [3] = true, [4] = true, [5] = true }
+if not validCameraViews[tonumber(GetCVar("cameraView"))] then SetCVar("cameraView", GetCVarDefault("cameraView")) end
+
 
 function CameraEffects.LoadOptions()
     local preset = Config.DBGlobal:GetVariable("CameraEffectsPreset")
@@ -177,7 +185,7 @@ CameraUtil.Snapshot = {}
 CameraUtil.Instances = {}
 CameraUtil.isPlaying = false
 CameraUtil.hasSnapshot = false
-CameraUtil.isSkyriding = C_PlayerInfo.GetGlidingInfo()
+CameraUtil.isSkyriding = GetGlidingInfo and GetGlidingInfo() or false
 
 function CameraUtil:CaptureSnapshot()
     if self.hasSnapshot then return end
@@ -350,7 +358,7 @@ function CameraUtil:OnEvent(event, ...)
     end
 end
 
-CameraUtil:RegisterEvent("PLAYER_IS_GLIDING_CHANGED")
+if GetGlidingInfo then CameraUtil:RegisterEvent("PLAYER_IS_GLIDING_CHANGED") end
 CameraUtil:RegisterEvent("ADDONS_UNLOADING")
 CameraUtil:SetScript("OnEvent", CameraUtil.OnEvent)
 
@@ -359,6 +367,51 @@ CameraUtil:SetScript("OnEvent", CameraUtil.OnEvent)
 local isSessionActive = false
 local sessionID = 0
 local ShoulderOffsetUtil = CreateFrame("Frame")
+local ShoulderOffsetStartTimer = LazyTimer.New()
+local ShoulderOffsetRestoreTimer = LazyTimer.New()
+
+local function GetShoulderOffsetRestoreDelay()
+    if Config.DBGlobal:GetVariable("ActiveMode") == env.Enum.Mode.Story then return 0 end
+    return 0.5
+end
+
+ShoulderOffsetStartTimer:SetAction(function()
+    if not isSessionActive then return end
+    if not CameraEffects.Enabled or InCombatLockdown() or not LWDialogFrame:IsShown() then return end
+
+    local currentSessionID = sessionID
+    local targetOffset = ShoulderOffsetUtil:GetShoulderOffsetForZoom(CameraEffects.SessionOptions[CameraEffects.Enum.Effects.Zoom] or GetCameraZoom())
+    if targetOffset == nil then return end
+
+    local duration = ShoulderOffsetUtil:GetShoulderOffsetDefValue("BeginDuration")
+    local easing = ShoulderOffsetUtil:GetShoulderOffsetDefValue("BeginEasing")
+    CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.ShoulderOffset, nil, targetOffset, duration, easing, function()
+        ShoulderOffsetUtil:Start(currentSessionID)
+    end)
+end)
+
+ShoulderOffsetRestoreTimer:SetAction(function()
+    if not isSessionActive or LWDialogFrame:IsShown() then return end
+
+    ShoulderOffsetUtil:Stop()
+    local duration = ShoulderOffsetUtil:GetShoulderOffsetDefValue("EndDuration")
+    local easing = ShoulderOffsetUtil:GetShoulderOffsetDefValue("EndEasing")
+    CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.ShoulderOffset, nil, CameraUtil.Snapshot[CameraEffects.Enum.Effects.ShoulderOffset], duration, easing)
+end)
+
+function ShoulderOffsetUtil:OnDialogFrameShow()
+    ShoulderOffsetStartTimer:Stop()
+    ShoulderOffsetRestoreTimer:Stop()
+    if not isSessionActive or not CameraEffects.Enabled or not CameraEffects.SessionOptions[CameraEffects.Enum.Effects.ShoulderOffset] then return end
+    if self.sessionID == sessionID then return end
+    ShoulderOffsetStartTimer:Start(0)
+end
+
+function ShoulderOffsetUtil:OnDialogFrameHide()
+    ShoulderOffsetStartTimer:Stop()
+    if not isSessionActive or not CameraEffects.SessionOptions[CameraEffects.Enum.Effects.ShoulderOffset] then return end
+    ShoulderOffsetRestoreTimer:Start(GetShoulderOffsetRestoreDelay())
+end
 
 function ShoulderOffsetUtil:GetShoulderOffsetDefValue(key)
     local shoulderOffsetDef = CameraEffects.SessionOptions[CameraEffects.Enum.Effects.ShoulderOffsetDef]
@@ -366,7 +419,12 @@ function ShoulderOffsetUtil:GetShoulderOffsetDefValue(key)
 end
 
 function ShoulderOffsetUtil:GetDialogFrameHorizontalDirection()
-    return (LWDialogFrame:GetLeft() + LWDialogFrame:GetWidth() / 2 > GetScreenWidth() / 2) and 1 or -1
+    local dialogFrameLeft = LWDialogFrame:GetLeft()
+    if dialogFrameLeft == nil then return nil end
+
+    local horizontalOffset = dialogFrameLeft + LWDialogFrame:GetWidth() / 2 - GetScreenWidth() / 2
+    if abs(horizontalOffset) <= HORIZONTAL_CENTER_THRESHOLD then return 0 end
+    return horizontalOffset > 0 and 1 or -1
 end
 
 function ShoulderOffsetUtil:GetMountedShoulderOffsetScale()
@@ -390,7 +448,11 @@ function ShoulderOffsetUtil:GetShoulderOffsetForZoom(zoom)
 
     if shoulderOffset == nil or baseZoom == nil or baseZoom == 0 then return nil end
 
-    local target = ShoulderOffsetUtil:GetMountedShoulderOffsetScale() * self:GetDialogFrameHorizontalDirection() * shoulderOffset * (zoom / baseZoom)
+    local horizontalDirection = self:GetDialogFrameHorizontalDirection()
+    if horizontalDirection == nil then return nil end
+
+    local target = ShoulderOffsetUtil:GetMountedShoulderOffsetScale() * horizontalDirection * shoulderOffset * (zoom / baseZoom)
+    if (GetShapeshiftForm() or 0) > 0 then target = target / 2 end
     return target > 0 and target or target / ShoulderOffsetUtil:GetMountedShoulderOffsetDivisor()
 end
 
@@ -435,16 +497,14 @@ ShoulderOffsetUtil:Hide()
 
 
 
-local E = CameraEffects.Enum.Effects
-local Opts = CameraEffects.SessionOptions
 local disableFov = false
 
 function CameraEffects.OnSkyridingStarted()
-    if not isSessionActive or disableFov or not Opts[E.Fov] then return end
+    if not isSessionActive or disableFov or not CameraEffects.SessionOptions[CameraEffects.Enum.Effects.Fov] then return end
 
     disableFov = true
-    CameraUtil:CancelInstances(E.Fov)
-    SetCVar(E.Fov, CameraUtil.Snapshot[E.Fov])
+    CameraUtil:CancelInstances(CameraEffects.Enum.Effects.Fov)
+    SetCVar(CameraEffects.Enum.Effects.Fov, CameraUtil.Snapshot[CameraEffects.Enum.Effects.Fov])
 end
 
 function CameraEffects.OnSessionBegin()
@@ -456,41 +516,30 @@ function CameraEffects.OnSessionBegin()
     CameraUtil:CaptureSnapshot()
     disableFov = CameraUtil.isSkyriding
 
-    if Opts[E.PitchLimit] then
-        CameraUtil:InterpolateCVar(E.PitchLimit, 88, Opts[E.PitchLimit], 1.75, UIAnim.Enum.Easing.SineInOut, CameraUtil.RestorePitchLimit)
+    if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.PitchLimit] then
+        CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.PitchLimit, 88, CameraEffects.SessionOptions[CameraEffects.Enum.Effects.PitchLimit], 1.75, UIAnim.Enum.Easing.SineInOut, CameraUtil.RestorePitchLimit)
     end
-    if Opts[E.ShowVignette] then
+    if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.ShowVignette] then
         LWVignette:FadeIn()
     end
-    if Opts[E.FocusInteractTarget] then
-        SetCVar(E.FocusInteractTarget, Opts[E.FocusInteractTarget])
-        if Opts[E.FocusInteractTargetPitchStrength] then
-            CameraUtil:InterpolateCVar(E.FocusInteractTargetPitchStrength, nil, Opts[E.FocusInteractTargetPitchStrength], 1, UIAnim.Enum.Easing.SineInOut)
+    if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTarget] then
+        SetCVar(CameraEffects.Enum.Effects.FocusInteractTarget, CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTarget])
+        if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTargetPitchStrength] then
+            CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.FocusInteractTargetPitchStrength, nil, CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTargetPitchStrength], 1, UIAnim.Enum.Easing.SineInOut)
         end
-        if Opts[E.FocusInteractTargetYawStrength] then
-            CameraUtil:InterpolateCVar(E.FocusInteractTargetYawStrength, nil, Opts[E.FocusInteractTargetYawStrength], 1, UIAnim.Enum.Easing.SineInOut)
+        if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTargetYawStrength] then
+            CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.FocusInteractTargetYawStrength, nil, CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTargetYawStrength], 1, UIAnim.Enum.Easing.SineInOut)
         end
     end
-    if Opts[E.ShoulderOffset] then
-        local currentSessionID = sessionID
-        C_Timer.After(0, function()
-            if currentSessionID ~= sessionID or not isSessionActive or not CameraEffects.Enabled or InCombatLockdown() then return end
-            local targetOffset = ShoulderOffsetUtil:GetShoulderOffsetForZoom(Opts[E.Zoom] or GetCameraZoom())
-            local duration = ShoulderOffsetUtil:GetShoulderOffsetDefValue("BeginDuration")
-            local easing = ShoulderOffsetUtil:GetShoulderOffsetDefValue("BeginEasing")
-            CameraUtil:InterpolateCVar(E.ShoulderOffset, nil, targetOffset, duration, easing, function()
-                ShoulderOffsetUtil:Start(currentSessionID)
-            end)
-        end)
+    if LWDialogFrame:IsShown() then ShoulderOffsetUtil:OnDialogFrameShow() end
+    if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.Fov] and not disableFov then
+        CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.Fov, nil, CameraEffects.SessionOptions[CameraEffects.Enum.Effects.Fov], 2, UIAnim.Enum.Easing.SineInOut)
     end
-    if Opts[E.Fov] and not disableFov then
-        CameraUtil:InterpolateCVar(E.Fov, nil, Opts[E.Fov], 2, UIAnim.Enum.Easing.SineInOut)
+    if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.HeadMovementStrength] then
+        CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.HeadMovementStrength, nil, CameraEffects.SessionOptions[CameraEffects.Enum.Effects.HeadMovementStrength], 2, UIAnim.Enum.Easing.SineInOut)
     end
-    if Opts[E.HeadMovementStrength] then
-        CameraUtil:InterpolateCVar(E.HeadMovementStrength, nil, Opts[E.HeadMovementStrength], 2, UIAnim.Enum.Easing.SineInOut)
-    end
-    if Opts[E.Zoom] then
-        CameraUtil:Zoom(Opts[E.Zoom])
+    if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.Zoom] then
+        CameraUtil:Zoom(CameraEffects.SessionOptions[CameraEffects.Enum.Effects.Zoom])
     end
 end
 
@@ -499,39 +548,41 @@ function CameraEffects.OnSessionEnd()
     isSessionActive = false
     sessionID = sessionID + 1
 
+    ShoulderOffsetStartTimer:Stop()
+    ShoulderOffsetRestoreTimer:Stop()
     ShoulderOffsetUtil:Stop()
     CameraUtil:CancelInstances()
 
-    if Opts[E.FocusInteractTarget] then
-        SetCVar(E.FocusInteractTarget, CameraUtil.Snapshot[E.FocusInteractTarget])
-        if Opts[E.FocusInteractTargetPitchStrength] then
-            CameraUtil:InterpolateCVar(E.FocusInteractTargetPitchStrength, nil, CameraUtil.Snapshot[E.FocusInteractTargetPitchStrength], 1.5, UIAnim.Enum.Easing.SineInOut)
+    if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTarget] then
+        SetCVar(CameraEffects.Enum.Effects.FocusInteractTarget, CameraUtil.Snapshot[CameraEffects.Enum.Effects.FocusInteractTarget])
+        if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTargetPitchStrength] then
+            CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.FocusInteractTargetPitchStrength, nil, CameraUtil.Snapshot[CameraEffects.Enum.Effects.FocusInteractTargetPitchStrength], 1.5, UIAnim.Enum.Easing.SineInOut)
         end
-        if Opts[E.FocusInteractTargetYawStrength] then
-            CameraUtil:InterpolateCVar(E.FocusInteractTargetYawStrength, nil, CameraUtil.Snapshot[E.FocusInteractTargetYawStrength], 1.5, UIAnim.Enum.Easing.SineInOut)
+        if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTargetYawStrength] then
+            CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.FocusInteractTargetYawStrength, nil, CameraUtil.Snapshot[CameraEffects.Enum.Effects.FocusInteractTargetYawStrength], 1.5, UIAnim.Enum.Easing.SineInOut)
         end
     end
-    if Opts[E.ShowVignette] then
+    if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.ShowVignette] then
         LWVignette:FadeOut()
     end
-    if Opts[E.ShoulderOffset] then
+    if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.ShoulderOffset] then
         local restoreSessionID = sessionID
-        local originalShoulderOffset = CameraUtil.Snapshot[E.ShoulderOffset]
+        local originalShoulderOffset = CameraUtil.Snapshot[CameraEffects.Enum.Effects.ShoulderOffset]
         local duration = ShoulderOffsetUtil:GetShoulderOffsetDefValue("EndDuration")
         local easing = ShoulderOffsetUtil:GetShoulderOffsetDefValue("EndEasing")
-        CameraUtil:InterpolateCVar(E.ShoulderOffset, nil, originalShoulderOffset, duration, easing, function(cvar)
+        CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.ShoulderOffset, nil, originalShoulderOffset, duration, easing, function(cvar)
             if isSessionActive or restoreSessionID ~= sessionID then return end
             SetCVar(cvar, originalShoulderOffset)
         end)
     end
-    if Opts[E.Fov] and not disableFov then
-        CameraUtil:InterpolateCVar(E.Fov, nil, CameraUtil.Snapshot[E.Fov], 1.5, UIAnim.Enum.Easing.SineInOut)
+    if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.Fov] and not disableFov then
+        CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.Fov, nil, CameraUtil.Snapshot[CameraEffects.Enum.Effects.Fov], 1.5, UIAnim.Enum.Easing.SineInOut)
     end
-    if Opts[E.HeadMovementStrength] then
-        CameraUtil:InterpolateCVar(E.HeadMovementStrength, nil, CameraUtil.Snapshot[E.HeadMovementStrength], 1.5, UIAnim.Enum.Easing.SineInOut)
+    if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.HeadMovementStrength] then
+        CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.HeadMovementStrength, nil, CameraUtil.Snapshot[CameraEffects.Enum.Effects.HeadMovementStrength], 1.5, UIAnim.Enum.Easing.SineInOut)
     end
-    if Opts[E.Zoom] then
-        CameraUtil:Zoom(CameraUtil.Snapshot[E.Zoom])
+    if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.Zoom] then
+        CameraUtil:Zoom(CameraUtil.Snapshot[CameraEffects.Enum.Effects.Zoom])
     end
 
     CameraUtil:RestorePitchLimit()
@@ -540,3 +591,7 @@ end
 
 CallbackRegistry.Add("ControlCenter.SessionBegin", CameraEffects.OnSessionBegin)
 CallbackRegistry.Add("ControlCenter.SessionEnd", CameraEffects.OnSessionEnd)
+CallbackRegistry.Add("Preload.AddonReady", function()
+    LWDialogFrame:HookScript("OnShow", function() ShoulderOffsetUtil:OnDialogFrameShow() end)
+    LWDialogFrame:HookScript("OnHide", function() ShoulderOffsetUtil:OnDialogFrameHide() end)
+end)

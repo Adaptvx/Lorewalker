@@ -16,6 +16,7 @@ local floor = math.floor
 local format = string.format
 local GetQuestPortraitGiver = GetQuestPortraitGiver
 local GetQuestPortraitTurnIn = GetQuestPortraitTurnIn
+local IsQuestCompletable = IsQuestCompletable
 
 
 ControlCenter.gossipInfo = nil
@@ -76,8 +77,19 @@ do --Caching
                 end
             end
             if questSessionType then
+                local questID = ControlCenter.questInfo and ControlCenter.questInfo.questID
+                local rewardChoiceIndex = ControlCenter.rewardChoiceIndex
+                local rewardChoices = ControlCenter.questInfo and ControlCenter.questInfo.questRewardsChoice
+                local rewardInfo = rewardChoices and rewardChoices[rewardChoiceIndex or 0]
+                local rewardID = rewardInfo and rewardInfo.rewardID
+                local rewardType = rewardInfo and rewardInfo.uk_poolElementType
                 ResetCache()
                 ControlCenter.questInfo = ControlCenter_DataProvider.BuildFullQuestInfoFromCurrentQuest()
+                rewardChoices = ControlCenter.questInfo.questRewardsChoice
+                rewardInfo = rewardChoices and rewardChoices[rewardChoiceIndex or 0]
+                if questID == ControlCenter.questInfo.questID and rewardID and rewardInfo and rewardInfo.rewardID == rewardID and rewardInfo.uk_poolElementType == rewardType then
+                    ControlCenter.rewardChoiceIndex = rewardChoiceIndex
+                end
                 CallbackRegistry.Trigger("ControlCenter.UpdateQuest")
             end
         else
@@ -121,6 +133,11 @@ do --Session
 end
 
 do --General
+    function ControlCenter.GetNPCGUID()
+        if not ControlCenter_Director.isInSession then return end
+        return UnitGUID("questnpc") or UnitGUID("npc")
+    end
+
     function ControlCenter.GetNPCName()
         if not ControlCenter_Director.isInSession then return end
         return UnitName("questnpc") or UnitName("npc")
@@ -213,7 +230,12 @@ do --Quest
         if not questInfo then return end
         local numChoices = questInfo.questRewardNumChoice or 0
         if numChoices <= 1 then return true end
-        return ControlCenter.rewardChoiceIndex and ControlCenter.rewardChoiceIndex > 0
+        local rewardChoiceIndex = ControlCenter.rewardChoiceIndex
+        return rewardChoiceIndex and rewardChoiceIndex > 0 and rewardChoiceIndex <= numChoices
+    end
+
+    function ControlCenter.CanContinueQuest()
+        return ControlCenter_Director.questSessionType == ControlCenter_Preload.Enum.SessionType.Progress and IsQuestCompletable()
     end
 end
 
@@ -223,12 +245,16 @@ do --Quest Actions
     end
 
     function ControlCenter.ContinueQuest()
-        if ControlCenter_Director.questSessionType then CompleteQuest() end
+        if ControlCenter.CanContinueQuest() then CompleteQuest() end
     end
 
     function ControlCenter.CompleteQuest()
-        if ControlCenter_Director.questSessionType then
-            GetQuestReward(ControlCenter.rewardChoiceIndex or 1)
+        if ControlCenter_Director.questSessionType == ControlCenter_Preload.Enum.SessionType.Complete and ControlCenter.IsRewardSelected() then
+            local rewardChoiceIndex = ControlCenter.rewardChoiceIndex or 0
+            if ControlCenter.questInfo and ControlCenter.questInfo.questRewardNumChoice == 1 then
+                rewardChoiceIndex = 1
+            end
+            GetQuestReward(rewardChoiceIndex)
         end
     end
 
@@ -237,7 +263,9 @@ do --Quest Actions
     end
 
     function ControlCenter.SelectReward(index)
-        if not ControlCenter_Director.questSessionType then return end
+        if ControlCenter_Director.questSessionType ~= ControlCenter_Preload.Enum.SessionType.Complete then return end
+        local rewardChoices = ControlCenter.questInfo and ControlCenter.questInfo.questRewardsChoice
+        if not rewardChoices or not rewardChoices[index] then return end
         ControlCenter.rewardChoiceIndex = index
         CallbackRegistry.Trigger("ControlCenter.QuestRewardChoiceSelected", index)
     end
@@ -286,6 +314,11 @@ do --Retrieval API
     ControlCenter.GetGossipOptionsQuestQuestComplete = function() return ControlCenter.gossipInfo and ControlCenter.gossipInfo.gossipCompleteQuests end
     ControlCenter.GetGossipOptionsQuestQuestIncomplete = function() return ControlCenter.gossipInfo and ControlCenter.gossipInfo.gossipIncompleteQuests end
     ControlCenter.GetGossipOptionsQuestQuestAvailable = function() return ControlCenter.gossipInfo and ControlCenter.gossipInfo.gossipAvailableQuests end
+    ControlCenter.HasGossipOptions = function()
+        local gossipInfo = ControlCenter.gossipInfo
+        if not gossipInfo then return false end
+        return (gossipInfo.gossipOptions and gossipInfo.gossipOptions[1] ~= nil) or (gossipInfo.gossipAvailableQuests and gossipInfo.gossipAvailableQuests[1] ~= nil) or (gossipInfo.gossipIncompleteQuests and gossipInfo.gossipIncompleteQuests[1] ~= nil) or (gossipInfo.gossipCompleteQuests and gossipInfo.gossipCompleteQuests[1] ~= nil)
+    end
     ControlCenter.IsGossipValidForUpdate = function()
         local gossipInfo = ControlCenter.gossipInfo
         if not gossipInfo then return false end
@@ -312,6 +345,8 @@ do --Retrieval API
     ControlCenter.GetQuestObjectiveText = function() return ControlCenter.questInfo and ControlCenter.questInfo.questObjectiveText end
     ControlCenter.GetQuestSpellObjective = function() return ControlCenter.questInfo and ControlCenter.questInfo.questSpellObjective end
     ControlCenter.GetQuestRequired = function() return ControlCenter.questInfo and ControlCenter.questInfo.questRequired end
+    ControlCenter.GetQuestRequiredCurrencies = function() return ControlCenter.questInfo and ControlCenter.questInfo.questRequiredCurrencies end
+    ControlCenter.GetQuestRequiredMoney = function() return ControlCenter.questInfo and ControlCenter.questInfo.questRequiredMoney end
     ControlCenter.GetQuestRewardChoice = function() return ControlCenter.questInfo and ControlCenter.questInfo.questRewardsChoice end
     ControlCenter.GetQuestRewardReceive = function() return ControlCenter.questInfo and ControlCenter.questInfo.questRewardReceive end
     ControlCenter.GetQuestRewardSpell = function() return ControlCenter.questInfo and ControlCenter.questInfo.questRewardsSpell end

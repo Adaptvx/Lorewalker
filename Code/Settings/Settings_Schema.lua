@@ -133,7 +133,8 @@ do -- Schema
                     widgetTransparent        = true,
                     widgetSelectionMenu_data = {
                         L["CONFIG_DIALOGUE_MODE_CLASSIC"],
-                        L["CONFIG_DIALOGUE_MODE_IMMERSIVE"]
+                        L["CONFIG_DIALOGUE_MODE_IMMERSIVE"],
+                        -- L["CONFIG_DIALOGUE_MODE_STORY"]
                     },
                     widgetSelectionMenu_set  = function(index)
                         Modes_ModeHandler.SetMode(index)
@@ -284,6 +285,25 @@ do -- Schema
                     widgetName       = L["CONFIG_ABOUT"],
                     widgetType       = Settings_Enum.WidgetType.Title,
                     widgetTitle_info = Settings_Define.TitleInfo{ imagePath = env.ICON_ALT, text = env.NAME, subtext = env.VERSION_STRING }
+                },
+                {
+                    widgetName        = L["CONFIG_ABOUT_CONTRIBUTORS"],
+                    widgetType        = Settings_Enum.WidgetType.Container,
+                    widgetTransparent = true,
+                    children          = {
+                        {
+                            widgetName        = L["CONTRIBUTORS_ZAMESTOTV"],
+                            widgetType        = Settings_Enum.WidgetType.Text,
+                            widgetDescription = Settings_Define.Descriptor{ description = L["CONTRIBUTORS_ZAMESTOTV_DESCRIPTION"] },
+                            widgetTransparent = true
+                        },
+                        {
+                            widgetName        = L["CONTRIBUTORS_CRAZYYOUNGS"],
+                            widgetType        = Settings_Enum.WidgetType.Text,
+                            widgetDescription = Settings_Define.Descriptor{ description = L["CONTRIBUTORS_CRAZYYOUNGS_DESCRIPTION"] },
+                            widgetTransparent = true
+                        }
+                    }
                 },
                 {
                     widgetName        = L["CONFIG_ABOUT_DEVELOPER"],

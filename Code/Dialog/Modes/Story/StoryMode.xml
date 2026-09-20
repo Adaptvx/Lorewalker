@@ -1,3 +1,5 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Script file="StoryMode_Preload.lua"/>
+    <Script file="StoryMode_UI.lua"/>
     <Script file="StoryMode.lua" />
 </Ui>

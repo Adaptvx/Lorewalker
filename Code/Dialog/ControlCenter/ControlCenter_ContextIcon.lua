@@ -39,6 +39,7 @@ ControlCenter_ContextIcon.TexDef = {
     GossipDialog              = UIKit.Define.Texture{ path = PATH .. "Gossip-Dialog" },
     GossipQuest               = UIKit.Define.Texture{ path = PATH .. "Gossip-Quest" },
     GossipRed                 = UIKit.Define.Texture{ path = PATH .. "Gossip-Red" },
+    GossipExit                = UIKit.Define.Texture{ path = PATH .. "Gossip-Exit" },
     Honor                     = UIKit.Define.Texture{ path = PATH .. "Honor" },
     IncompleteCampaignQuest   = UIKit.Define.Texture{ path = PATH .. "IncompleteCampaignQuest" },
     IncompleteCallingQuest    = UIKit.Define.Texture{ path = PATH .. "IncompleteCallingQuest" },

@@ -32,6 +32,7 @@ local GetQuestClassificationByQuestID = C_QuestInfoSystem.GetQuestClassification
 local GetQuestLogIndexByQuestID = C_QuestLog.GetLogIndexForQuestID or GetQuestLogIndexByID or Zero
 local GetQuestLogInfoByIndex = C_QuestLog.GetInfo or Nil
 local GetQuestLogTitleByIndex = GetQuestLogTitle or Nil
+local GetRequiredMoneyByQuestID = C_QuestLog.GetRequiredMoney
 local IsQuestFlaggedCompletedOnAccount = C_QuestLog.IsQuestFlaggedCompletedOnAccount or False
 local QuestGetAutoAccept = QuestGetAutoAccept or False
 local HasQuestSessionBonus = C_QuestLog.QuestHasQuestSessionBonus or False
@@ -41,11 +42,13 @@ local GetCampaignIDByQuestID = (C_CampaignInfo and C_CampaignInfo.GetCampaignID)
 local GetRewardXP = GetRewardXP or Nil
 local GetRewardHonor = GetRewardHonor or Nil
 local GetRewardMoney = GetRewardMoney
+local GetQuestMoneyToGet = GetQuestMoneyToGet or Zero
 local GetRewardArtifactXP = GetRewardArtifactXP or Nil
 local GetRewardSkillPoints = GetRewardSkillPoints or Nil
 local GetNumQuestRewards = GetNumQuestRewards
 local GetNumQuestChoices = GetNumQuestChoices
 local GetNumQuestItems = GetNumQuestItems
+local GetNumQuestCurrencies = GetNumQuestCurrencies or Zero
 local GetQuestItemInfo = GetQuestItemInfo
 local GetQuestRewardSpellIDs = C_QuestInfoSystem.GetQuestRewardSpells
 local GetQuestRewardCurrenciesByQuestID = C_QuestInfoSystem.GetQuestRewardCurrencies or Nil
@@ -53,8 +56,9 @@ local GetQuestRewardSpellInfo = C_QuestInfoSystem.GetQuestRewardSpellInfo
 local GetNumQuestLogRewardCurrencies = GetNumQuestLogRewardCurrencies or Zero
 local GetQuestLogRewardCurrencyInfo = GetQuestLogRewardCurrencyInfo or Nil
 local GetQuestItemInfoLootType = GetQuestItemInfoLootType or Zero
-local GetQuestOfferRewardCurrencyInfo = C_QuestOffer.GetQuestRewardCurrencyInfo or Nil
-local GetQuestOfferMajorFactionReputationRewards = C_QuestOffer.GetQuestOfferMajorFactionReputationRewards or Nil
+local GetQuestOfferRewardCurrencyInfo = (C_QuestOffer and C_QuestOffer.GetQuestRewardCurrencyInfo) or Nil
+local GetQuestRequiredCurrencyInfo = (C_QuestOffer and C_QuestOffer.GetQuestRequiredCurrencyInfo) or Nil
+local GetQuestOfferMajorFactionReputationRewards = (C_QuestOffer and C_QuestOffer.GetQuestOfferMajorFactionReputationRewards) or Nil
 local GetGreetingText = GetGreetingText
 local GetGossipText = C_GossipInfo.GetText
 local GetCurrencyContainerInfo = C_CurrencyInfo.GetCurrencyContainerInfo
@@ -80,6 +84,11 @@ local ipairs = ipairs
 local pairs = pairs
 local wipe = table.wipe
 local tsort = table.sort
+
+local function GetQuestRequiredMoney(questID)
+    if GetRequiredMoneyByQuestID then return GetRequiredMoneyByQuestID(questID) end
+    return GetQuestMoneyToGet()
+end
 
 local TYPE_GOSSIP = Enum.PlayerInteractionType and Enum.PlayerInteractionType.Gossip
 local TYPE_QUEST_GIVER = Enum.PlayerInteractionType and Enum.PlayerInteractionType.QuestGiver
@@ -407,6 +416,33 @@ do --Fetchers
         return result
     end
 
+    function ControlCenter_DataProvider.FetchRequiredCurrencies()
+        local result = Pools.result:Acquire()
+
+        if not WoWClient.IS_RETAIL then
+            return result
+        end
+
+        for index = 1, GetNumQuestCurrencies() do
+            local currencyData = GetQuestRequiredCurrencyInfo(index)
+            if currencyData then
+                local currencyInfo = Pools.currency:Acquire()
+                currencyInfo.rewardID = currencyData.currencyID
+                currencyInfo.name = currencyData.name
+                currencyInfo.texture = currencyData.texture
+                currencyInfo.quality = currencyData.quality
+                currencyInfo.baseRewardAmount = currencyData.requiredAmount
+                currencyInfo.totalRewardAmount = currencyData.requiredAmount
+                currencyInfo.containerInfo = GetCurrencyContainerInfo(currencyData.currencyID, currencyData.requiredAmount)
+                currencyInfo.questRewardType = "required"
+                currencyInfo.questRewardIndex = index
+                result[#result + 1] = currencyInfo
+            end
+        end
+
+        return result
+    end
+
     function ControlCenter_DataProvider.FetchGossipOptions(gossipOptions)
         local result = Pools.result:Acquire()
 
@@ -414,6 +450,7 @@ do --Fetchers
             local optionName = gossipOption.name or ""
             local optionInfo = Pools.option:Acquire()
             optionInfo.name = ControlCenter_Formatting.FormatOption(optionName, gossipOption.flags)
+            optionInfo.alternateName = ControlCenter_Formatting.FormatOption(optionName, gossipOption.flags, true)
             optionInfo.icon = gossipOption.icon
             optionInfo.optionFlag = gossipOption.flags
             optionInfo.optionType = ControlCenter_Preload.Enum.OptionType.Gossip
@@ -492,6 +529,8 @@ do --Quest Info
         local questRewardChoices = ControlCenter_DataProvider.FetchChoiceInfo(questRewardNumChoice)
         local questRewardReceive = ControlCenter_DataProvider.FetchItemInfo("reward", questRewardNumReceive)
         local questRequired = ControlCenter_DataProvider.FetchItemInfo("required", questRewardNumRequired)
+        local questRequiredCurrencies = ControlCenter_DataProvider.FetchRequiredCurrencies()
+        local questRequiredMoney = GetQuestRequiredMoney(questID)
         local questRewardSpells = ControlCenter_DataProvider.FetchSpells("reward", questID, GetQuestRewardSpellIDs(questID))
         local questRewardCurrencies = ControlCenter_DataProvider.FetchCurrencies(questID)
         local objectiveSpellID, objectiveSpellName, objectiveSpellTexture = GetCriteriaSpell()
@@ -530,6 +569,8 @@ do --Quest Info
         QuestInfoBuffer.questResetTime = GetQuestResetTime()
         QuestInfoBuffer.questBackground = GetQuestDetailsTheme(questID)
         QuestInfoBuffer.questRequired = questRequired
+        QuestInfoBuffer.questRequiredCurrencies = questRequiredCurrencies
+        QuestInfoBuffer.questRequiredMoney = questRequiredMoney
         QuestInfoBuffer.questRewardReceive = questRewardReceive
         QuestInfoBuffer.questRewardChoices = questRewardChoices
         QuestInfoBuffer.questRewardSpells = questRewardSpells
@@ -540,6 +581,7 @@ do --Quest Info
         QuestInfoBuffer.questRewardNumChoice = questRewardNumChoice
         QuestInfoBuffer.questRewardNumSpell = #questRewardSpells
         QuestInfoBuffer.questRewardNumRequired = questRewardNumRequired
+        QuestInfoBuffer.questRewardNumRequiredCurrencies = #questRequiredCurrencies
         QuestInfoBuffer.questRewardNumCurrencies = #questRewardCurrencies
         QuestInfoBuffer.questRewardCurrencies = questRewardCurrencies
         QuestInfoBuffer.questRewardExperience = GetRewardXP()

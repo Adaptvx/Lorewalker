@@ -9,8 +9,8 @@ local Path = env.modules:Import("packages\\path")
 env.NAME = "Lorewalker"
 env.ICON = Path.Root .. "\\Art\\Icons\\Logo"
 env.ICON_ALT = Path.Root .. "\\Art\\Icons\\Logo-White"
-env.VERSION_STRING = "Beta 3"
-env.VERSION_NUMBER = 000003
+env.VERSION_STRING = "Beta 4"
+env.VERSION_NUMBER = 000004
 env.DEBUG_MODE = false
 
 
@@ -65,6 +65,11 @@ do
             x = nil,
             y = nil,
         },
+        storyDialogBoxBounds = {
+            point = nil,
+            x = nil,
+            y = nil,
+        },
         userKeybinds = {},
 
         Theme                                              = Enum.Theme.Light,
@@ -72,6 +77,7 @@ do
 
         DialogFontSizeOffset                               = 1, --100%
         ChatBubbleFontSizeOffset                           = 1, --100%
+        ConfirmUseInteractKey                              = false,
 
         HideUI                                             = false,
         CameraEffectsPreset                                = Enum.CameraEffectsPreset.None,
@@ -96,6 +102,7 @@ do
         Immersive_PlaybackPunctuationPausing  = true,
         Immersive_PlaybackAutoClose           = true,
         Immersive_ContentPreviewAlpha         = .5,
+        Story_PlaybackSpeed                   = 1,
 
         AudioGlobal                           = true,
     }

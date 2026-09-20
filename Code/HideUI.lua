@@ -129,6 +129,13 @@ local isSessionActive = false
 local hideUIForSession = false
 local hideUIForCinematic = false
 
+function HideUI.ShowForDressUp()
+    if not hideUIForSession then return end
+
+    hideUIForSession = false
+    HideUI.FadeIn(true)
+end
+
 function HideUI.OnSessionBegin()
     if isSessionActive then return end
     isSessionActive = true

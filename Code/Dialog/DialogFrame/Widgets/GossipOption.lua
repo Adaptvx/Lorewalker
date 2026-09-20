@@ -1,4 +1,5 @@
 local env = select(2, ...)
+local Config = env.Config
 local UIFont = env.modules:Import("packages\\ui-font")
 local UIKit = env.modules:Import("packages\\ui-kit")
 local Frame, LayoutGrid, LayoutHorizontal, LayoutVertical, Text, ScrollContainer, LazyScrollContainer, ScrollBar, ScrollContainerEdge, Input, LinearSlider, HitRect, List, SecureButton, ModelScene = unpack(UIKit.UI.Frames)
@@ -74,13 +75,17 @@ do -- Option
 end
 
 do -- Group
+    local function OnOptionUpdate(element, index, value)
+        GossipOptionBase.OnOptionUpdate(element, index, value, Config.DBGlobal:GetVariable("Theme") == env.Enum.Theme.Dark)
+    end
+
     GossipOption.Group = UIKit.Template(function(id, name, children, ...)
         local frame =
             LayoutVertical(name, {
                 List(name .. ".OptionListFrame")
                     :id("OptionListFrame", id)
                     :poolTemplate(GossipOption.Option)
-                    :poolElementUpdate(GossipOptionBase.OnOptionUpdate)
+                    :poolElementUpdate(OnOptionUpdate)
             })
             :size(UIKit.UI.P_FILL, UIKit.UI.FIT)
 

@@ -7,6 +7,7 @@ local Frame, LayoutGrid, LayoutHorizontal, LayoutVertical, Text, ScrollContainer
 local UICSharedMixin = env.modules:Import("packages\\uic-sharedmixin")
 local Dialog_UIWidgets = env.modules:Import("@\\Dialog\\UIWidgets")
 local InputUtil = env.modules:Import("@\\InputUtil")
+local HideUI = env.modules:Import("@\\HideUI")
 local ControlCenter_ContextIcon = env.modules:Import("@\\Dialog\\ControlCenter\\ContextIcon")
 local ControlCenter_OptionFlags = env.modules:Import("@\\Dialog\\ControlCenter\\OptionFlags")
 local ControlCenter = env.modules:Import("@\\Dialog\\ControlCenter")
@@ -235,6 +236,7 @@ function RewardButtonBaseMixin:RewardButton_OnClick()
     end
 
     if self.rewardButtonType == DialogFrame_Preload.Enum.RewardButtonType.Item and IsModifiedClick("DRESSUP") then
+        HideUI.ShowForDressUp()
         return DressUpLink(self.rewardItemLink)
     end
 

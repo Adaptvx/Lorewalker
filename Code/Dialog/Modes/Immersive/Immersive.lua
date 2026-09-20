@@ -1,5 +1,4 @@
 local env = select(2, ...)
-local L = env.L
 local Enum = env.Enum
 local Config = env.Config
 local Sound = env.modules:Import("packages\\sound")
@@ -7,6 +6,8 @@ local CallbackRegistry = env.modules:Import("packages\\callback-registry")
 local UIAnim = env.modules:Import("packages\\ui-anim")
 local Utils_Blizzard = env.modules:Import("packages\\utils\\blizzard")
 local Dialog_Preload = env.modules:Import("@\\Dialog\\Preload")
+local SharedUtil = env.modules:Import("@\\Dialog\\SharedUtil")
+local TextPlaybackUtil = env.modules:Import("@\\Dialog\\TextPlaybackUtil")
 local ControlCenter = env.modules:Import("@\\Dialog\\ControlCenter")
 local DialogFrame = env.modules:Import("@\\Dialog\\DialogFrame")
 local Modes_ModeHandler = env.modules:Import("@\\Dialog\\Modes\\ModeHandler")
@@ -22,128 +23,19 @@ local UnitIsGameObject = UnitIsGameObject
 local UnitExists = UnitExists
 local UnitIsUnit = UnitIsUnit
 local UnitName = UnitName
-local ResetCursor = ResetCursor
-local SetCursor = SetCursor
 local Mixin = Mixin
-local strlenutf8 = strlenutf8
 local gmatch = string.gmatch
 local gsub = string.gsub
-local byte = string.byte
-local find = string.find
 local format = string.format
-local sub = string.sub
-local floor = math.floor
 local max = math.max
 local min = math.min
-local tonumber = tonumber
-local type = type
 
 
 ImmersiveMode.isActive = false
 
 
-local TEXT_PLAYBACK_INTERVAL = 0.05
-local TEXT_PLAYBACK_PAUSE_DURATION = 0.125
-
-local TextPlaybackUtil = {}
-do
-    function TextPlaybackUtil.GetCharacterStartIndex(text, characterIndex)
-        local byteIndex = 1
-        local currentCharacterIndex = 0
-
-        while byteIndex <= #text do
-            local characterStartIndex = byteIndex
-            local characterByte = byte(text, byteIndex)
-            if characterByte <= 127 then
-                byteIndex = byteIndex + 1
-            elseif characterByte <= 223 then
-                byteIndex = byteIndex + 2
-            elseif characterByte <= 239 then
-                byteIndex = byteIndex + 3
-            elseif characterByte <= 247 then
-                byteIndex = byteIndex + 4
-            else
-                byteIndex = byteIndex + 1
-            end
-
-            currentCharacterIndex = currentCharacterIndex + 1
-            if currentCharacterIndex == characterIndex then return characterStartIndex end
-        end
-    end
-
-    function TextPlaybackUtil.GetCharacterEndIndex(text, characterIndex)
-        local startIndex = TextPlaybackUtil.GetCharacterStartIndex(text, characterIndex)
-        if not startIndex then return end
-
-        local characterByte = byte(text, startIndex)
-        if characterByte <= 127 then return startIndex end
-        if characterByte <= 223 then return startIndex + 1 end
-        if characterByte <= 239 then return startIndex + 2 end
-        if characterByte <= 247 then return startIndex + 3 end
-    end
-
-    function TextPlaybackUtil.GetSubstring(text, firstCharacter, lastCharacter)
-        local startIndex = TextPlaybackUtil.GetCharacterStartIndex(text, firstCharacter)
-        local endIndex = TextPlaybackUtil.GetCharacterEndIndex(text, lastCharacter)
-        return startIndex and endIndex and sub(text, startIndex, endIndex) or ""
-    end
-
-    function TextPlaybackUtil.AdjustForEscapeSequences(text, characterCount)
-        if characterCount >= strlenutf8(text) then return characterCount end
-
-        local currentText = TextPlaybackUtil.GetSubstring(text, 1, characterCount)
-        local textureStartIndex = find(currentText, "|T[^|]*$")
-        if textureStartIndex then
-            local textureEndIndex = find(text, "|t", textureStartIndex)
-            if textureEndIndex then
-                return strlenutf8(sub(text, 1, textureEndIndex + 1))
-            end
-        end
-
-        local atlasStartIndex = find(currentText, "|A[^|]*$")
-        if atlasStartIndex then
-            local atlasEndIndex = find(text, "|a", atlasStartIndex)
-            if atlasEndIndex then
-                return strlenutf8(sub(text, 1, atlasEndIndex + 1))
-            end
-        end
-
-        return characterCount
-    end
-
-    function TextPlaybackUtil.IsPauseCharacter(character)
-        local pauseCharacters = L["PLAYBACK_PAUSE_CHARACTERS"]
-        for index = 1, #pauseCharacters do
-            if find(pauseCharacters[index], character, 1, true) then
-                return true
-            end
-        end
-        return false
-    end
-end
-
-
 local ImmersiveModeUtil = {}
 do
-    function ImmersiveModeUtil.SplitText(text, splitParagraphs)
-        if not text or type(text) ~= "string" then return end
-
-        text = gsub(text, " %s+", " ")
-        text = gsub(text, "|c%x%x%x%x%x%x%x%x", "")
-        text = gsub(text, "|r", "")
-        text = splitParagraphs and gsub(text, "\n+", "\n") or gsub(text, "([\\.|>|<|!|?|\n])%s+", "%1\n")
-
-        local lines = {}
-        for segment in gmatch(text, "[^\n]+") do
-            segment = gsub(segment, "^%s*(.-)%s*$", "%1")
-            if segment ~= "" then
-                lines[#lines + 1] = segment
-            end
-        end
-
-        return lines
-    end
-
     function ImmersiveModeUtil.GetEmoteIndexes(messages)
         local results = {}
         local isInEmote = false
@@ -187,19 +79,6 @@ do
         return isGameObject or isPlayer or isItem
     end
 
-    function ImmersiveModeUtil.HasGossipOptions()
-        local options = ControlCenter.GetGossipOptions()
-        if options and options[1] then return true end
-
-        options = ControlCenter.GetGossipOptionsQuestQuestAvailable()
-        if options and options[1] then return true end
-
-        options = ControlCenter.GetGossipOptionsQuestQuestIncomplete()
-        if options and options[1] then return true end
-
-        options = ControlCenter.GetGossipOptionsQuestQuestComplete()
-        return options and options[1] ~= nil
-    end
 end
 
 
@@ -390,22 +269,7 @@ function ChatBubbleMixin:OnLoad()
     self:SetScript("OnEnter", self.OnEnter)
     self:SetScript("OnLeave", self.OnLeave)
     self:SetScript("OnUpdate", self.OnUpdate)
-    self:SetScript("OnDragStart", function()
-        if self.isNameplateAnchored then return end
-
-        self.isDragging = true
-
-        SetCursor("Interface\\Cursor\\UI-Cursor-Move")
-        self:StartMoving()
-    end)
-    self:SetScript("OnDragStop", function()
-        self.isDragging = false
-
-        ResetCursor()
-        self:StopMovingOrSizing()
-        if not self.isNameplateAnchored then self:SavePosition() end
-        C_Timer.After(0, function() self.isDragging = false end)
-    end)
+    SharedUtil.InitializeBoundsForFrame(self, "immersiveChatBubbleBounds", self, 1)
 
     self:Hide()
 end
@@ -484,7 +348,7 @@ function ChatBubbleMixin:PreviousDialog()
 end
 
 function ChatBubbleMixin:NextDialog()
-    if not ImmersiveMode.isActive or not self:IsShown() then return false end
+    if not ImmersiveMode.isActive or not self:IsShown() or self.isFinished then return false end
     return self:ShowNextMessage()
 end
 
@@ -579,27 +443,17 @@ function ChatBubbleMixin:IsValidNameplate(nameplate)
 end
 
 function ChatBubbleMixin:RestorePosition()
-    local bounds = Config.DBGlobal:GetVariable("immersiveChatBubbleBounds")
-    if not bounds or not bounds.point or bounds.x == nil or bounds.y == nil then
-        self:SetDefaultPosition()
-        return
-    end
-
-    self:ClearAllPoints()
-    self:SetPoint(bounds.point, UIParent, bounds.x, bounds.y)
+    SharedUtil.RestoreBounds(self)
 end
 
-function ChatBubbleMixin:SavePosition()
-    local point, _, _, x, y = self:GetPoint()
-
-    Config.DBGlobal:SetVariable({ "immersiveChatBubbleBounds", "point" }, point)
-    Config.DBGlobal:SetVariable({ "immersiveChatBubbleBounds", "x" }, x)
-    Config.DBGlobal:SetVariable({ "immersiveChatBubbleBounds", "y" }, y)
+function ChatBubbleMixin:GetDefaultPosition()
+    return "CENTER", UIParent, "TOP", 0, -UIParent:GetHeight() / 6
 end
 
 function ChatBubbleMixin:SetDefaultPosition()
+    local point, relativeTo, relativePoint, x, y = self:GetDefaultPosition()
     self:ClearAllPoints()
-    self:SetPoint("CENTER", UIParent, "TOP", 0, -UIParent:GetHeight() / 6)
+    self:SetPoint(point, relativeTo, relativePoint, x, y)
 end
 
 function ChatBubbleMixin:RestoreNameplate()
@@ -645,7 +499,7 @@ function ChatBubbleMixin:SetNameplate(unit)
 end
 
 function ChatBubbleMixin:IsPlaybackEnabled()
-    return Config.DBGlobal:GetVariable("Immersive_Playback")
+    return TextPlaybackUtil.IsPlaybackEnabled()
 end
 
 function ChatBubbleMixin:CancelAutoProgress()
@@ -665,23 +519,12 @@ function ChatBubbleMixin:StopTextPlayback(showFullText)
     end
 end
 
-function ChatBubbleMixin:GetTextPreviewHexColor()
-    local previewAlpha = tonumber(Config.DBGlobal:GetVariable("Immersive_ContentPreviewAlpha")) or 0.5
-    local previewModifier = 0.2 + min(max(previewAlpha, 0), 1) / 1.25
-    local red, green, blue = self.String:GetTextColor()
-
-    red = min(max(floor(red * previewModifier * 255), 0), 255)
-    green = min(max(floor(green * previewModifier * 255), 0), 255)
-    blue = min(max(floor(blue * previewModifier * 255), 0), 255)
-    return format("%02x%02x%02x", red, green, blue)
-end
-
 function ChatBubbleMixin:ScheduleAutoProgress()
     self:CancelAutoProgress()
     if not self:IsPlaybackEnabled() then return end
-    if not Config.DBGlobal:GetVariable("Immersive_PlaybackAutoProgress") then return end
+    if not TextPlaybackUtil.IsAutoProgressEnabled() then return end
 
-    local delay = max(tonumber(Config.DBGlobal:GetVariable("Immersive_PlaybackAutoProgressDelay")) or 1, 0)
+    local delay = TextPlaybackUtil.GetAutoProgressDelay()
     local sourceText = self.sourceText
     local messageIndex = self.messageIndex
 
@@ -711,58 +554,26 @@ function ChatBubbleMixin:OnTextPlaybackUpdate(elapsed)
     local playbackState = self.textPlaybackState
     if not playbackState then return end
 
-    if playbackState.pauseActive then
-        playbackState.pauseElapsed = playbackState.pauseElapsed + elapsed
-        if playbackState.pauseElapsed < TEXT_PLAYBACK_PAUSE_DURATION then return end
-
-        playbackState.pauseActive = false
-        playbackState.pauseElapsed = 0
-    end
-
-    playbackState.elapsed = playbackState.elapsed + elapsed
-
-    local textLength = strlenutf8(playbackState.text)
-    local characterCount = min(floor(playbackState.elapsed / playbackState.interval) + 1, textLength)
-    characterCount = TextPlaybackUtil.AdjustForEscapeSequences(playbackState.text, characterCount)
-
-    if playbackState.pauseEnabled and playbackState.lastPauseIndex ~= characterCount then
-        local lastCharacter = TextPlaybackUtil.GetSubstring(playbackState.text, characterCount, characterCount)
-        if TextPlaybackUtil.IsPauseCharacter(lastCharacter) then
-            playbackState.lastPauseIndex = characterCount
-            playbackState.pauseActive = true
-        end
-    end
-
-    local currentText = TextPlaybackUtil.GetSubstring(playbackState.text, 1, characterCount)
-    local remainingText = TextPlaybackUtil.GetSubstring(playbackState.text, characterCount + 1, textLength)
+    local currentText, remainingText, isFinished = TextPlaybackUtil.Update(playbackState, elapsed)
+    if not currentText then return end
 
     if remainingText ~= "" and self.appearance ~= ImmersiveMode_Preload.Enum.Appearance.Emote then
-        self.String:SetText(currentText .. "|cff" .. self:GetTextPreviewHexColor() .. remainingText .. "|r")
+        local previewColor = TextPlaybackUtil.GetPreviewHexColor(self.String)
+        self.String:SetText(currentText .. "|cff" .. previewColor .. remainingText .. "|r")
     else
         self.String:SetText(currentText .. remainingText)
     end
 
-    if characterCount >= textLength then
-        self:OnTextPlaybackFinished()
-    end
+    if isFinished then self:OnTextPlaybackFinished() end
 end
 
 function ChatBubbleMixin:StartTextPlayback(text, shouldAutoProgress)
     self:CancelAutoProgress()
     self:StopTextPlayback()
 
-    local playbackSpeed = max(tonumber(Config.DBGlobal:GetVariable("Immersive_PlaybackSpeed")) or 1, 0.1)
-    local playbackSpeedModifier = tonumber(L["PLAYBACK_SPEED_MODIFIER"]) or 1
-    self.textPlaybackState = {
-        text               = text,
-        elapsed            = 0,
-        interval           = TEXT_PLAYBACK_INTERVAL / (playbackSpeed * playbackSpeedModifier),
-        pauseEnabled       = Config.DBGlobal:GetVariable("Immersive_PlaybackPunctuationPausing"),
-        pauseActive        = false,
-        pauseElapsed       = 0,
-        lastPauseIndex     = nil,
-        shouldAutoProgress = shouldAutoProgress == true
-    }
+    local playbackSpeed = Config.DBGlobal:GetVariable("Immersive_PlaybackSpeed")
+    self.textPlaybackState = TextPlaybackUtil.CreateState(text, playbackSpeed)
+    self.textPlaybackState.shouldAutoProgress = shouldAutoProgress == true
 
     self:OnTextPlaybackUpdate(0)
 end
@@ -802,8 +613,8 @@ function ChatBubbleMixin:SetMessageToIndex(index, skipPlayback, shouldAutoProgre
 end
 
 function ChatBubbleMixin:SetMessage(msg, restartDialog)
-    local splitParagraphs = Config.DBGlobal:GetVariable("Immersive_SplitParagraphs")
-    local messages = ImmersiveModeUtil.SplitText(msg, splitParagraphs)
+    local splitParagraphs = TextPlaybackUtil.ShouldSplitParagraphs()
+    local messages = TextPlaybackUtil.SplitText(msg, splitParagraphs)
     if not messages or not messages[1] then
         self.messages = nil
         self.messageIndex = nil
@@ -873,7 +684,7 @@ function ChatBubbleMixin:ShowNextMessage(continueAutoProgress)
         self:StopTextPlayback(true)
 
         local autoClose = Config.DBGlobal:GetVariable("Immersive_PlaybackAutoClose")
-        if self:IsPlaybackEnabled() and autoClose and ControlCenter.GetGossipSessionType() and not ImmersiveModeUtil.HasGossipOptions() then
+        if self:IsPlaybackEnabled() and autoClose and ControlCenter.GetGossipSessionType() and not ControlCenter.HasGossipOptions() then
             CloseSession()
         else
             self:Open()

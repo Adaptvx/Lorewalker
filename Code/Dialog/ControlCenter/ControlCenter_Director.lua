@@ -17,6 +17,7 @@ local GetAvailableQuests = C_GossipInfo.GetAvailableQuests
 local GetGossipOptions = C_GossipInfo.GetOptions
 local GetNumActiveQuests = C_GossipInfo.GetNumActiveQuests
 local GetNumAvailableQuests = C_GossipInfo.GetNumAvailableQuests
+local GetQuestID = GetQuestID
 local QuestIsFromAreaTrigger = QuestIsFromAreaTrigger or False
 local QuestGetAutoAccept = QuestGetAutoAccept or False
 local SelectOptionByIndex = C_GossipInfo.SelectOptionByIndex
@@ -42,7 +43,6 @@ local EVENTS = {
     "QUEST_FINISHED",
     "QUEST_COMPLETE",
     "QUEST_TURNED_IN",
-    "QUEST_AUTOCOMPLETE",
     "GOSSIP_SHOW",
     "GOSSIP_CLOSED",
     "GOSSIP_CONFIRM",
@@ -134,7 +134,6 @@ end
         QUEST_PROGRESS
         QUEST_COMPLETE
         QUEST_TURNED_IN
-        QUEST_AUTOCOMPLETE
         QUEST_FINISHED
         GOSSIP_SHOW
         GOSSIP_CLOSED
@@ -148,6 +147,7 @@ do
     local throttlePool = {}
     local isSessionActive = false
     local isContinuingNPCInteraction = false
+    local isNonNPCQuestSession = false
     local isGreeting = false
     local sessionEndDelay = 0
     local scanFinalInteraction = false
@@ -197,6 +197,7 @@ do
     local function ResetSession()
         isSessionActive = false
         isContinuingNPCInteraction = false
+        isNonNPCQuestSession = false
         isGreeting = false
         sessionEndDelay = 0
         scanFinalInteraction = false
@@ -277,6 +278,10 @@ do
         return interactionType == Enum.PlayerInteractionType.Gossip or interactionType == Enum.PlayerInteractionType.QuestGiver
     end
 
+    local function IsQuestItemInteractionType(interactionType)
+        return interactionType == Enum.PlayerInteractionType.Item and (isNonNPCQuestSession or ControlCenter_Director.questSessionType)
+    end
+
     local function BeginQuestSession()
         if QuestIsFromAreaTrigger() and QuestGetAutoAccept() then
             return
@@ -285,8 +290,17 @@ do
         EventListener:BeginSession()
     end
 
-    local function OnSessionBegin(event)
+    local function OnSessionBegin(event, ...)
         isSessionActive = true
+
+        if event == "QUEST_DETAIL" then
+            local questStartItemID = ...
+            if (questStartItemID or 0) > 0 then
+                isNonNPCQuestSession = true
+            end
+        elseif GOSSIP_SESSION_TYPE_LOOKUP[event] then
+            isNonNPCQuestSession = false
+        end
 
         if QUEST_SESSION_TYPE_LOOKUP[event] then
             BeginQuestSession()
@@ -311,7 +325,9 @@ do
         end
 
         ControlCenter_Director.isInSession = true
-        SessionOpenWatchdogTimer:Start(SESSION_OPEN_WATCHDOG_DELAY)
+        if not isNonNPCQuestSession then
+            SessionOpenWatchdogTimer:Start(SESSION_OPEN_WATCHDOG_DELAY)
+        end
         CallbackRegistry.Trigger("ControlCenter.SessionBegin")
     end
 
@@ -320,7 +336,7 @@ do
             return
         end
 
-        if clearInteraction and not isContinuingNPCInteraction then
+        if clearInteraction and not isContinuingNPCInteraction and not isNonNPCQuestSession then
             ClearInteraction()
         end
 
@@ -360,6 +376,8 @@ do
 
     SessionOpenWatchdogTimer:SetAction(function()
         if not ControlCenter_Director.isInSession then return end
+        if isNonNPCQuestSession then return end
+        if ControlCenter_Director.questSessionType and (GetQuestID() or 0) > 0 then return end
         if ControlCenter_DataProvider.IsInteractingWithNpc() then return end
         EventListener:EndSession(true)
     end)
@@ -374,7 +392,7 @@ do
         end
 
         if BEGIN_SESSION_EVENTS[event] then
-            OnSessionBegin(event)
+            OnSessionBegin(event, ...)
         elseif END_SESSION_EVENTS[event] then
             OnSessionEnd()
         end
@@ -412,6 +430,7 @@ do
 
         if event == "PLAYER_INTERACTION_MANAGER_FRAME_SHOW" then
             local interactionType = ...
+            if IsQuestItemInteractionType(interactionType) then return end
             if not IsDialogInteractionType(interactionType) then
                 CallbackRegistry.Trigger("ControlCenter.SessionClosing")
                 EventListener:EndSession()
@@ -421,6 +440,7 @@ do
 
         if event == "PLAYER_INTERACTION_MANAGER_FRAME_HIDE" then
             local interactionType = ...
+            if IsQuestItemInteractionType(interactionType) then return end
             if IsDialogInteractionType(interactionType) then
                 CallbackRegistry.Trigger("ControlCenter.SessionClosing")
                 OnSessionEnd()

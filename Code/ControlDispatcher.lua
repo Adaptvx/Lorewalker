@@ -55,7 +55,24 @@ local function HandleSelectionResult(selected, deselected, allowScroll, scrollFu
     end
 end
 
+local function IsStoryOptionsShown()
+    return LWStoryOptionsBox:IsActive()
+end
+
+local function HandleStoryOptionsAction(handler)
+    if not IsStoryOptionsShown() then return end
+
+    if handler(LWStoryOptionsBox) then
+        WoWClient.BlockKeyEvent()
+        return true
+    end
+    return false
+end
+
 local function HandleConfirmAction()
+    local result = HandleStoryOptionsAction(LWStoryOptionsBox.ConfirmSelection)
+    if result ~= nil then return result end
+
     if LWDialogFrame:ConfirmGossipSelection() or LWDialogFrame:ConfirmQuestSelection() then
         WoWClient.BlockKeyEvent()
         return true
@@ -75,6 +92,9 @@ local function HandleCloseAction()
 end
 
 local function HandleScrollDownAction()
+    local result = HandleStoryOptionsAction(LWStoryOptionsBox.SelectNextOption)
+    if result ~= nil then return result end
+
     if LWDialogFrame.GossipFrame:IsShown() then
         local selected, deselected, allowScroll = LWDialogFrame:SelectNextGossipOption()
         local result = HandleSelectionResult(selected, deselected, allowScroll, TryScrollDown, LWDialogFrame.GossipFrame.ScrollContainer)
@@ -94,6 +114,9 @@ local function HandleScrollDownAction()
 end
 
 local function HandleScrollUpAction()
+    local result = HandleStoryOptionsAction(LWStoryOptionsBox.SelectPreviousOption)
+    if result ~= nil then return result end
+
     if LWDialogFrame.GossipFrame:IsShown() then
         local selected, deselected, allowScroll = LWDialogFrame:SelectPreviousGossipOption()
         local result = HandleSelectionResult(selected, deselected, allowScroll, TryScrollUp, LWDialogFrame.GossipFrame.ScrollContainer)
@@ -113,6 +136,10 @@ local function HandleScrollUpAction()
 end
 
 local function HandleSelectDialogOptionAction(optionIndex)
+    if IsStoryOptionsShown() then
+        return LWStoryOptionsBox:SelectDialogOption(optionIndex)
+    end
+
     ControlDispatcher.pushedDialogOption = LWDialogFrame:SetDialogOptionPushed(optionIndex, true)
 
     if ControlCenter.SelectDialogOption(optionIndex) then return true end
@@ -185,8 +212,31 @@ local IMMERSIVE_ACTIONS = {
     },
 }
 
+local STORY_ACTIONS = {
+    [InputUtil.Enum.Actions.Confirm] = {
+        handler = LWStoryDialogBox.NextDialog,
+        block = true,
+    },
+    [InputUtil.Enum.Actions.Close] = {
+        handler = function()
+            if not ControlCenter.IsInSession() then return false end
+            DialogFrame.RequestCloseSession()
+            return true
+        end,
+        block = true,
+    },
+    [InputUtil.Enum.Actions.NextDialog]  = {
+        handler = LWStoryDialogBox.NextDialog,
+        block = true,
+    },
+}
+
 local function IsImmersiveModeActive()
     return Modes_ModeHandler.IsModeActive(Enum.Mode.Immersive)
+end
+
+local function IsStoryModeActive()
+    return Modes_ModeHandler.IsModeActive(Enum.Mode.Story)
 end
 
 local function IsDialogFrameShown()
@@ -194,7 +244,7 @@ local function IsDialogFrameShown()
 end
 
 local function CanProcessKeyInput()
-    return IsImmersiveModeActive() or IsDialogFrameShown()
+    return IsImmersiveModeActive() or IsStoryModeActive() or IsDialogFrameShown()
 end
 
 local function GetActionForKey(key, actions)
@@ -206,11 +256,26 @@ local function GetActionForKey(key, actions)
 end
 
 local function HandleActionForKey(key)
+    if IsStoryModeActive() then
+        local action = GetActionForKey(key, STORY_ACTIONS)
+        if action and action.handler(LWStoryDialogBox) then
+            return action, IsStoryModeActive
+        end
+    end
+
     if IsImmersiveModeActive() then
         local action = GetActionForKey(key, IMMERSIVE_ACTIONS)
         if action and action.handler(LWImmersiveChatBubble) then
             return action, IsImmersiveModeActive
         end
+    end
+
+    if IsStoryOptionsShown() then
+        local action = GetActionForKey(key, DIALOG_FRAME_ACTIONS)
+        if action and action.handler() then
+            return action, IsStoryOptionsShown
+        end
+        return
     end
 
     if IsDialogFrameShown() then

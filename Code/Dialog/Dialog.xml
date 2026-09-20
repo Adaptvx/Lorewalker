@@ -1,5 +1,7 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
     <Include file="Preload.lua"/>
+    <Include file="SharedUtil.lua"/>
+    <Include file="TextPlaybackUtil.lua"/>
     <Include file="CVars.lua"/>
     <Include file="UIWidgets.lua"/>
     <Include file="ControlCenter\ControlCenter.xml"/>

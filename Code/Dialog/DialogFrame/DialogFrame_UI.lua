@@ -260,6 +260,19 @@ do -- DetailsFrame
                         QuestReward.SpellRewardGroup(name .. ".QuestSpellObjective")
                             :id("QuestSpellObjective", id),
 
+                        --Required Items
+                        Spacer(name .. ".QuestRequiredItemsSpacer")
+                            :id("QuestRequiredItemsSpacer", id),
+
+                        QuestCategoryLabel(name .. ".QuestRequiredItemsHeader")
+                            :id("QuestRequiredItemsHeader", id),
+
+                        QuestReward.ItemRewardButtonGroup(name .. ".QuestRequiredItems")
+                            :id("QuestRequiredItems", id),
+
+                        QuestReward.CurrencyRewardButtonGroup(name .. ".QuestRequiredCurrencies")
+                            :id("QuestRequiredCurrencies", id),
+
                         --Rewards
                         Spacer(name .. ".QuestRewardsSpacer")
                             :id("QuestRewardsSpacer", id),
@@ -343,6 +356,10 @@ do -- DetailsFrame
         frame.QuestObjectives = UIKit.GetElementById("QuestObjectives", id)
         frame.QuestSpellObjectiveHeader = UIKit.GetElementById("QuestSpellObjectiveHeader", id)
         frame.QuestSpellObjective = UIKit.GetElementById("QuestSpellObjective", id)
+        frame.QuestRequiredItemsSpacer = UIKit.GetElementById("QuestRequiredItemsSpacer", id)
+        frame.QuestRequiredItemsHeader = UIKit.GetElementById("QuestRequiredItemsHeader", id)
+        frame.QuestRequiredItems = UIKit.GetElementById("QuestRequiredItems", id)
+        frame.QuestRequiredCurrencies = UIKit.GetElementById("QuestRequiredCurrencies", id)
         frame.QuestRewardsSpacer = UIKit.GetElementById("QuestRewardsSpacer", id)
         frame.QuestRewardsHeader = UIKit.GetElementById("QuestRewardsHeader", id)
         frame.QuestItemRewardsHeader = UIKit.GetElementById("QuestItemRewardsHeader", id)
@@ -362,6 +379,7 @@ do -- DetailsFrame
 
         frame.QuestObjectivesHeader:SetText(L["OBJECTIVES"])
         frame.QuestSpellObjectiveHeader:SetText(L["LEARN_SPELL_OBJECTIVE"])
+        frame.QuestRequiredItemsHeader:SetText(L["REQUIRED_ITEMS"])
         frame.QuestRewardsHeader:SetText(L["REWARDS"])
         frame.QuestRewardMoney:SetRewardIcon(Path.Root .. "\\Art\\Icons\\Gold")
         frame.QuestRewardHonor:SetRewardIcon(Path.Root .. "\\Art\\Icons\\Honor")
