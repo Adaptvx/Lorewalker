@@ -381,7 +381,7 @@ do -- DetailsFrame
         frame.QuestSpellObjectiveHeader:SetText(L["LEARN_SPELL_OBJECTIVE"])
         frame.QuestRequiredItemsHeader:SetText(L["REQUIRED_ITEMS"])
         frame.QuestRewardsHeader:SetText(L["REWARDS"])
-        frame.QuestRewardMoney:SetRewardIcon(Path.Root .. "\\Art\\Icons\\Gold")
+        frame.QuestRewardMoney:SetRewardIcon(nil)
         frame.QuestRewardHonor:SetRewardIcon(Path.Root .. "\\Art\\Icons\\Honor")
         frame.QuestRewardXP:SetRewardIcon(Path.Root .. "\\Art\\Icons\\XP")
 

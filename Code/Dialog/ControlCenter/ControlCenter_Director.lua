@@ -92,6 +92,11 @@ local END_SESSION_EVENTS = {
     QUEST_FINISHED = true
 }
 
+function ControlCenter_Director.SelectGossipOption(optionKey)
+    CallbackRegistry.Trigger("ControlCenter.SelectGossipOption", optionKey)
+    SelectOptionByIndex(optionKey)
+end
+
 local function IsFirstGossipOptionAutoSelectable()
     if Config.DBGlobal:GetVariable("ForceGossip") ~= false or ForceGossip() then
         return false
@@ -114,7 +119,7 @@ local function TryAutoSelectFirstGossipOption()
         return false
     end
 
-    SelectOptionByIndex(GetGossipOptions()[1].orderIndex)
+    ControlCenter_Director.SelectGossipOption(GetGossipOptions()[1].orderIndex)
     return true
 end
 
@@ -128,6 +133,7 @@ end
         ControlCenter.CombatBegin
         ControlCenter.CombatEnd
         ControlCenter.Update
+        ControlCenter.SelectGossipOption
         QUEST_GREETING
         QUEST_GREETING_CLOSED
         QUEST_DETAIL

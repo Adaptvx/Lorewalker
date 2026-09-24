@@ -133,7 +133,7 @@ do -- Schema
                     widgetTransparent        = true,
                     widgetSelectionMenu_data = {
                         L["CONFIG_DIALOGUE_MODE_CLASSIC"],
-                        L["CONFIG_DIALOGUE_MODE_IMMERSIVE"],
+                        L["CONFIG_DIALOGUE_MODE_IMMERSIVE"]
                         -- L["CONFIG_DIALOGUE_MODE_STORY"]
                     },
                     widgetSelectionMenu_set  = function(index)
@@ -301,6 +301,12 @@ do -- Schema
                             widgetName        = L["CONTRIBUTORS_CRAZYYOUNGS"],
                             widgetType        = Settings_Enum.WidgetType.Text,
                             widgetDescription = Settings_Define.Descriptor{ description = L["CONTRIBUTORS_CRAZYYOUNGS_DESCRIPTION"] },
+                            widgetTransparent = true
+                        },
+                        {
+                            widgetName        = L["CONTRIBUTORS_LANJIAN625"],
+                            widgetType        = Settings_Enum.WidgetType.Text,
+                            widgetDescription = Settings_Define.Descriptor{ description = L["CONTRIBUTORS_LANJIAN625"] },
                             widgetTransparent = true
                         }
                     }

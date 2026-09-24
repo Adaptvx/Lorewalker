@@ -100,7 +100,7 @@ local function GetRewardDisplayInfo(rewardButtonType, rewardInfo)
     else
         amountText = amount and amount > 1 and amount
     end
-    
+
     if rewardButtonType == DialogFrame_Preload.Enum.RewardButtonType.Currency and amountText then
         amountText = AbbreviateNumbers(amountText)
     end
@@ -431,7 +431,7 @@ do -- Choice Reward Button
         local buttonState = self:GetButtonState()
         local stateKey = (not isAnyRewardSelected and "Normal") or (isSelectedReward and "Selected") or "Other"
         local state = BACKGROUND_ANIMATION_LOOKUP[stateKey]
-        
+
         self.Background:SetAlpha(state.Background[buttonState])
         self.Border:SetAlpha(state.Border[buttonState])
         self:SetAlpha((stateKey == "Other" and ALPHA_OTHER) or ALPHA_NORMAL)
@@ -685,12 +685,17 @@ end
 
 do -- Reward Text
     local GAP = 6
-    local TEXT_WIDTH = UIKit.Define.Percentage{ value = 100, operator = "-", delta = 18 + GAP }
+    local TEXT_WIDTH = UIKit.Define.Percentage{ value = 100, operator = "-", delta = function(frame) return UIKit.GetElementById("Icon", frame.templateID):IsShown() and 18 + GAP or 0 end }
 
     local RewardTextMixin = {}
 
     function RewardTextMixin:SetRewardIcon(iconTexture)
-        self.Icon:SetTexture(iconTexture)
+        local wasShown = self.Icon:IsShown()
+        self.Icon:SetShown(iconTexture ~= nil)
+        self.IconTexture:SetTexture(iconTexture)
+        if wasShown ~= self.Icon:IsShown() then
+            self:_Render()
+        end
     end
 
     function RewardTextMixin:SetRewardText(itemText)
@@ -699,7 +704,7 @@ do -- Reward Text
 
     QuestReward.RewardText = UIKit.Template(function(id, name, children, ...)
         local frame =
-            Frame(name, {
+            LayoutHorizontal(name, {
                 Frame(name .. ".Icon")
                     :id("Icon", id)
                     :frameLevel(2)
@@ -710,9 +715,7 @@ do -- Reward Text
                 Text(name .. ".Label")
                     :id("Label", id)
                     :frameLevel(2)
-                    :size(TEXT_WIDTH, UIKit.UI.P_FILL)
-                    :point(UIKit.Enum.Point.Left)
-                    :x(18 + GAP)
+                    :size(TEXT_WIDTH, UIKit.UI.FIT)
                     :textJustifyH("LEFT")
                     :fontObject(UIFont.ParchmentItemText)
                     :textColor(DialogFrame_Preload.TextColorPrimary)
@@ -720,9 +723,14 @@ do -- Reward Text
                     :alpha(0.8)
             })
             :size(UIKit.UI.P_FILL, UIKit.UI.FIT)
+            :layoutAlignmentH(UIKit.Enum.Direction.Leading)
+            :layoutAlignmentV(UIKit.Enum.Direction.Justified)
+            :layoutSpacing(GAP)
 
-        frame.Icon = UIKit.GetElementById("Icon", id):GetTextureFrame()
+        frame.Icon = UIKit.GetElementById("Icon", id)
+        frame.IconTexture = frame.Icon:GetTextureFrame()
         frame.Label = UIKit.GetElementById("Label", id)
+        frame.Label.templateID = id
 
         Mixin(frame, RewardTextMixin)
 

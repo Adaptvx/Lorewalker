@@ -20,7 +20,31 @@ local GetRewardText = GetRewardText
 local GetObjectiveText = GetObjectiveText
 local GetCriteriaSpell = GetCriteriaSpell
 local GetQuestObjectivesByQuestID = C_QuestLog.GetQuestObjectives
-local GetQuestTagInfoByQuestID = C_QuestLog.GetQuestTagInfo or GetQuestTagInfo or Nil
+local GetQuestTagInfoByQuestID
+do
+    local GetQuestTagInfoNew = C_QuestLog.GetQuestTagInfo
+    local GetQuestTagInfoOld = GetQuestTagInfo
+
+    if GetQuestTagInfoNew then
+        GetQuestTagInfoByQuestID = GetQuestTagInfoNew
+    elseif GetQuestTagInfoOld then
+        GetQuestTagInfoByQuestID = function(questID)
+            local tagID, tagName, worldQuestType, rarity, isElite, tradeskillLineIndex = GetQuestTagInfoOld(questID)
+            if not tagID then return nil end
+            return {
+                tagID = tagID,
+                tagName = tagName,
+                worldQuestType = worldQuestType,
+                rarity = rarity,
+                isElite = isElite,
+                tradeskillLineIndex = tradeskillLineIndex,
+            }
+        end
+    else
+        GetQuestTagInfoByQuestID = Nil
+    end
+end
+
 local GetQuestResetTime = GetQuestResetTime or Nil
 local GetQuestTimeLeftSeconds = C_TaskQuest.GetQuestTimeLeftSeconds
 local IsQuestCompleteByQuestID = C_QuestLog.IsComplete or IsQuestComplete or False

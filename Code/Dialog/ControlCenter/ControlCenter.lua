@@ -1,12 +1,13 @@
 local env = select(2, ...)
 local CallbackRegistry = env.modules:Import("packages\\callback-registry")
+local UIFont = env.modules:Import("packages\\ui-font")
 local ControlCenter_Preload = env.modules:Import("@\\Dialog\\ControlCenter\\Preload")
+local ControlCenter_ContextIcon = env.modules:Import("@\\Dialog\\ControlCenter\\ContextIcon")
 local ControlCenter_DataProvider = env.modules:Import("@\\Dialog\\ControlCenter\\DataProvider")
 local ControlCenter_Director = env.modules:Import("@\\Dialog\\ControlCenter\\Director")
 local ControlCenter = env.modules:New("@\\Dialog\\ControlCenter")
 
 local GetCampaignInfo = C_CampaignInfo and C_CampaignInfo.GetCampaignInfo
-local SelectOptionByIndex = C_GossipInfo.SelectOptionByIndex
 local C_GossipInfo_SelectAvailableQuest = C_GossipInfo.SelectAvailableQuest
 local C_GossipInfo_SelectActiveQuest = C_GossipInfo.SelectActiveQuest
 local SelectAvailableQuest = SelectAvailableQuest
@@ -175,7 +176,7 @@ do --Gossip
             SetGossipQuest(true)
 
         elseif optionType == ControlCenter_Preload.Enum.OptionType.Gossip then
-            SelectOptionByIndex(optionKey)
+            ControlCenter_Director.SelectGossipOption(optionKey)
             SetGossipQuest(false)
         end
     end
@@ -219,10 +220,12 @@ do --Quest
     function ControlCenter.GetRewardMoneyFormatted()
         local valid, copper, silver, gold = ControlCenter.GetRewardMoney()
         if not valid then return end
-        local g = gold > 0 and gold .. "g " or ""
-        local s = silver > 0 and silver .. "s " or ""
-        local c = copper > 0 and copper .. "c" or ""
-        return g .. s .. c
+        local _, iconSize = UIFont.ParchmentItemText:GetFont()
+        iconSize = iconSize + 4
+        local moneyText = gold > 0 and gold .. " |T" .. ControlCenter_ContextIcon.TexDef.Gold.path .. ":" .. iconSize .. ":" .. iconSize .. "|t" or ""
+        if silver > 0 then moneyText = moneyText .. (moneyText ~= "" and " " or "") .. silver .. " |T" .. ControlCenter_ContextIcon.TexDef.Silver.path .. ":" .. iconSize .. ":" .. iconSize .. "|t" end
+        if copper > 0 then moneyText = moneyText .. (moneyText ~= "" and " " or "") .. copper .. " |T" .. ControlCenter_ContextIcon.TexDef.Copper.path .. ":" .. iconSize .. ":" .. iconSize .. "|t" end
+        return moneyText
     end
 
     function ControlCenter.IsRewardSelected()

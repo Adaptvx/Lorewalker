@@ -9,8 +9,8 @@ local Path = env.modules:Import("packages\\path")
 env.NAME = "Lorewalker"
 env.ICON = Path.Root .. "\\Art\\Icons\\Logo"
 env.ICON_ALT = Path.Root .. "\\Art\\Icons\\Logo-White"
-env.VERSION_STRING = "Beta 4"
-env.VERSION_NUMBER = 000004
+env.VERSION_STRING = "Beta 5"
+env.VERSION_NUMBER = 000005
 env.DEBUG_MODE = false
 
 
@@ -85,6 +85,7 @@ do
         CameraEffects_ShowVignette                         = nil,
         CameraEffects_PitchLimit                           = nil,
         CameraEffects_Fov                                  = nil,
+        CameraEffects_Pan                                  = nil,
         CameraEffects_ShoulderOffset                       = nil,
         CameraEffects_HeadMovementStrength                 = nil,
         CameraEffects_FocusInteractTarget                  = nil,

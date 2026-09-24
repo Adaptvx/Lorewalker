@@ -5,6 +5,7 @@ local SavedVariables = env.modules:Import("packages\\saved-variables")
 local UIAnim = env.modules:Import("packages\\ui-anim")
 local WoWClient = env.modules:Import("packages\\wow-client")
 local Tooltip = env.modules:Import("@\\Tooltip")
+local ControlCenter_ContextIcon = env.modules:Await("@\\Dialog\\ControlCenter\\ContextIcon")
 local HideUI = env.modules:New("@\\HideUI")
 
 local UIParent = UIParent
@@ -12,6 +13,9 @@ local WorldFrame = WorldFrame
 local EventRegistry = EventRegistry
 local UIModeUtil = UIModeUtil
 local InCombatLockdown = InCombatLockdown
+local SetUnitCursorTexture = SetUnitCursorTexture
+local UnitExists = UnitExists
+local GetGossipOptions = C_GossipInfo.GetOptions
 
 
 local UI_MODE_ROLESET_BLOCKLIST = {
@@ -128,6 +132,35 @@ end
 local isSessionActive = false
 local hideUIForSession = false
 local hideUIForCinematic = false
+local showUIForGossipOption = false
+local InteractTypeTexture = CreateFrame("Frame"):CreateTexture()
+
+function HideUI.OnSelectGossipOption(_, optionKey)
+    if not hideUIForSession or hideUIForCinematic or InCombatLockdown() then return end
+
+    local gossipOption = GetGossipOptions()[optionKey]
+    local gossipIcon = gossipOption and gossipOption.icon
+
+    if not gossipIcon or gossipIcon == ControlCenter_ContextIcon.GossipIcon then
+        if not UnitExists("npc") then return end
+
+        SetUnitCursorTexture(InteractTypeTexture, "npc")
+        local interactType = InteractTypeTexture:GetTexture()
+        if interactType ~= "Cursor Trainer" and interactType ~= "Cursor Crosshair_Trainer_64" then return end
+    end
+
+    showUIForGossipOption = true
+    HideUI.FadeIn(true)
+end
+
+function HideUI.OnShowGossip()
+    if not showUIForGossipOption then return end
+    showUIForGossipOption = false
+
+    if hideUIForSession and not hideUIForCinematic and not InCombatLockdown() then
+        HideUI.FadeOut(true)
+    end
+end
 
 function HideUI.ShowForDressUp()
     if not hideUIForSession then return end
@@ -151,6 +184,7 @@ end
 function HideUI.OnSessionEnd()
     if not isSessionActive then return end
     isSessionActive = false
+    showUIForGossipOption = false
 
     WorldFrame:SetAlpha(1)
 
@@ -189,6 +223,8 @@ function HideUI.OnCombatBegin()
     end
 end
 
+CallbackRegistry.Add("ControlCenter.SelectGossipOption", HideUI.OnSelectGossipOption)
+CallbackRegistry.Add("ControlCenter.ShowGossip", HideUI.OnShowGossip)
 CallbackRegistry.Add("ControlCenter.SessionBegin", HideUI.OnSessionBegin)
 CallbackRegistry.Add("ControlCenter.SessionEnd", HideUI.OnSessionEnd)
 CallbackRegistry.Add("ControlCenter.CinematicBegin", HideUI.OnCinematicBegin)

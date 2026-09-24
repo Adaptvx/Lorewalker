@@ -15,6 +15,10 @@ local GetCameraZoom = GetCameraZoom
 local GetShapeshiftForm = GetShapeshiftForm
 local CameraZoomIn = CameraZoomIn
 local CameraZoomOut = CameraZoomOut
+local MoveViewLeftStart = MoveViewLeftStart
+local MoveViewLeftStop = MoveViewLeftStop
+local MoveViewRightStart = MoveViewRightStart
+local MoveViewRightStop = MoveViewRightStop
 local ConsoleExec = ConsoleExec
 local InCombatLockdown = InCombatLockdown
 local SetCVar = SetCVar
@@ -85,12 +89,13 @@ CameraEffects.Enum = {
         PitchLimit                       = "pitchlimit",
 
         Fov                              = "cameraFov",
+        Pan                              = 3,
         ShoulderOffset                   = "test_cameraOverShoulder",
         ShoulderOffsetDef                = {
-            BeginDuration = 3,
-            BeginEasing   = 4,
-            EndDuration   = 5,
-            EndEasing     = 6
+            BeginDuration = 4,
+            BeginEasing   = 5,
+            EndDuration   = 6,
+            EndEasing     = 7
         },
         CameraOverShoulderEasing         = "cameraOverShoulderEasing",
         HeadMovementStrength             = "test_cameraHeadMovementStrength",
@@ -108,6 +113,7 @@ CameraEffects.Presets = {
         [CameraEffects.Enum.Effects.ShowVignette]                     = true,
         [CameraEffects.Enum.Effects.PitchLimit]                       = 15,
         [CameraEffects.Enum.Effects.Fov]                              = 60,
+        [CameraEffects.Enum.Effects.Pan]                              = nil,
         [CameraEffects.Enum.Effects.ShoulderOffset]                   = 1.5,
         [CameraEffects.Enum.Effects.ShoulderOffsetDef]                = {
             [CameraEffects.Enum.Effects.ShoulderOffsetDef.BeginDuration] = 2.5,
@@ -115,16 +121,17 @@ CameraEffects.Presets = {
             [CameraEffects.Enum.Effects.ShoulderOffsetDef.EndDuration]   = 1.5,
             [CameraEffects.Enum.Effects.ShoulderOffsetDef.EndEasing]     = UIAnim.Enum.Easing.SineOut
         },
-        [CameraEffects.Enum.Effects.HeadMovementStrength]             = nil,
-        [CameraEffects.Enum.Effects.FocusInteractTarget]              = false,
-        [CameraEffects.Enum.Effects.FocusInteractTargetPitchStrength] = nil,
-        [CameraEffects.Enum.Effects.FocusInteractTargetYawStrength]   = nil
+        [CameraEffects.Enum.Effects.HeadMovementStrength]             = 1,
+        [CameraEffects.Enum.Effects.FocusInteractTarget]              = true,
+        [CameraEffects.Enum.Effects.FocusInteractTargetPitchStrength] = 0.5,
+        [CameraEffects.Enum.Effects.FocusInteractTargetYawStrength]   = 0.5
     },
     [env.Enum.CameraEffectsPreset.Balanced] = {
         [CameraEffects.Enum.Effects.Zoom]                             = nil,
         [CameraEffects.Enum.Effects.ShowVignette]                     = true,
         [CameraEffects.Enum.Effects.PitchLimit]                       = nil,
         [CameraEffects.Enum.Effects.Fov]                              = nil,
+        [CameraEffects.Enum.Effects.Pan]                              = nil,
         [CameraEffects.Enum.Effects.ShoulderOffset]                   = 7,
         [CameraEffects.Enum.Effects.ShoulderOffsetDef]                = {
             [CameraEffects.Enum.Effects.ShoulderOffsetDef.BeginDuration] = 2.5,
@@ -206,6 +213,7 @@ function CameraUtil:CaptureSnapshot()
 end
 
 function CameraUtil:RestoreFromSnapshot()
+    self:StopPan()
     if not self.hasSnapshot then return end
 
     for cvar, value in pairs(self.Snapshot) do
@@ -296,6 +304,31 @@ function CameraUtil:Zoom(zoomLevel)
     end
 end
 
+function CameraUtil:Pan(speed)
+    self:StopPan()
+    if type(speed) ~= "number" or speed == 0 then return end
+
+    self.panSpeed = speed
+    if speed < 0 then
+        MoveViewLeftStart(0)
+    else
+        MoveViewRightStart(0)
+    end
+    self:InterpolateCVar(CameraEffects.Enum.Effects.Pan, 0, abs(speed), 2, UIAnim.Enum.Easing.SineInOut)
+end
+
+function CameraUtil:StopPan()
+    if not self.panSpeed then return end
+
+    self:CancelInstances(CameraEffects.Enum.Effects.Pan)
+    if self.panSpeed < 0 then
+        MoveViewLeftStop()
+    else
+        MoveViewRightStop()
+    end
+    self.panSpeed = nil
+end
+
 function CameraUtil:RestorePitchLimit()
     ConsoleExec("pitchlimit 88")
 end
@@ -319,6 +352,12 @@ function CameraUtil:OnUpdate(elapsed)
 
         if cvar == CameraEffects.Enum.Effects.PitchLimit then
             ConsoleExec("pitchlimit " .. value)
+        elseif cvar == CameraEffects.Enum.Effects.Pan then
+            if self.panSpeed < 0 then
+                MoveViewLeftStart(value)
+            else
+                MoveViewRightStart(value)
+            end
         else
             SetCVar(cvar, value)
         end
@@ -525,10 +564,10 @@ function CameraEffects.OnSessionBegin()
     if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTarget] then
         SetCVar(CameraEffects.Enum.Effects.FocusInteractTarget, CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTarget])
         if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTargetPitchStrength] then
-            CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.FocusInteractTargetPitchStrength, nil, CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTargetPitchStrength], 1, UIAnim.Enum.Easing.SineInOut)
+            CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.FocusInteractTargetPitchStrength, 0, CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTargetPitchStrength], 2, UIAnim.Enum.Easing.SineInOut)
         end
         if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTargetYawStrength] then
-            CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.FocusInteractTargetYawStrength, nil, CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTargetYawStrength], 1, UIAnim.Enum.Easing.SineInOut)
+            CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.FocusInteractTargetYawStrength, 0, CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTargetYawStrength], 2, UIAnim.Enum.Easing.SineInOut)
         end
     end
     if LWDialogFrame:IsShown() then ShoulderOffsetUtil:OnDialogFrameShow() end
@@ -541,6 +580,7 @@ function CameraEffects.OnSessionBegin()
     if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.Zoom] then
         CameraUtil:Zoom(CameraEffects.SessionOptions[CameraEffects.Enum.Effects.Zoom])
     end
+    CameraUtil:Pan(CameraEffects.SessionOptions[CameraEffects.Enum.Effects.Pan])
 end
 
 function CameraEffects.OnSessionEnd()
@@ -551,6 +591,7 @@ function CameraEffects.OnSessionEnd()
     ShoulderOffsetStartTimer:Stop()
     ShoulderOffsetRestoreTimer:Stop()
     ShoulderOffsetUtil:Stop()
+    CameraUtil:StopPan()
     CameraUtil:CancelInstances()
 
     if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.FocusInteractTarget] then
