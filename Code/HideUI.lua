@@ -16,6 +16,7 @@ local InCombatLockdown = InCombatLockdown
 local SetUnitCursorTexture = SetUnitCursorTexture
 local UnitExists = UnitExists
 local GetGossipOptions = C_GossipInfo.GetOptions
+local ipairs = ipairs
 
 
 local UI_MODE_ROLESET_BLOCKLIST = {
@@ -138,8 +139,13 @@ local InteractTypeTexture = CreateFrame("Frame"):CreateTexture()
 function HideUI.OnSelectGossipOption(_, optionKey)
     if not hideUIForSession or hideUIForCinematic or InCombatLockdown() then return end
 
-    local gossipOption = GetGossipOptions()[optionKey]
-    local gossipIcon = gossipOption and gossipOption.icon
+    local gossipIcon = nil
+    for _, gossipOption in ipairs(GetGossipOptions()) do
+        if gossipOption.orderIndex == optionKey then
+            gossipIcon = gossipOption.icon
+            break
+        end
+    end
 
     if not gossipIcon or gossipIcon == ControlCenter_ContextIcon.GossipIcon then
         if not UnitExists("npc") then return end

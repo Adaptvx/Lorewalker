@@ -21,7 +21,21 @@ local function GetSelectedTabFrame()
     return Settings_Constructor.Tabs[selectedTabIndex]
 end
 
+local function GetFirstVisibleTabIndex()
+    for i = 1, #Settings_Constructor.TabButtons do
+        if Settings_Constructor.TabButtons[i]:IsShown() then
+            return i
+        end
+    end
+end
+
 function Setting:OpenTabByIndex(index)
+    local requestedTabButton = Settings_Constructor.TabButtons[index]
+    if not requestedTabButton or not requestedTabButton:IsShown() then
+        index = GetFirstVisibleTabIndex()
+    end
+    if not index then return end
+
     selectedTabIndex = index
 
     for i = 1, #Settings_Constructor.Tabs do
@@ -55,7 +69,7 @@ end
 
 local function SetupSettingUI()
     Settings_Constructor:SetBuildTargetFrame(SettingFrame.Content.Container)
-    Settings_Constructor:Build(Settings_Schema.SCHEMA)
+    Settings_Constructor:Build(Settings_Schema.SCHEMA, Settings_Schema.BINDING_BUTTON_OPTIONS)
 
     SettingFrame:SetParent(SettingFrameAnchor)
     SettingFrame:SetPoint("CENTER", SettingFrameAnchor)

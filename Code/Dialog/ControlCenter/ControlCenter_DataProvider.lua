@@ -224,7 +224,7 @@ local function CreateQuestOption(optionType, optionKey, questInfo)
     return optionInfo
 end
 
-local function BuildPartialQuestInfo(questID, questName, isTrivial, isComplete, frequency, isRepeatable, isLegendary, isImportant)
+local function BuildPartialQuestInfo(questID, questName, isTrivial, isComplete, frequency, isRepeatable, isLegendary, isImportant, level)
     questID = questID or 0
 
     local questInfo = Pools.quest:Acquire()
@@ -232,6 +232,7 @@ local function BuildPartialQuestInfo(questID, questName, isTrivial, isComplete, 
 
     questInfo.questID = questID
     questInfo.questName = questName or ""
+    questInfo.questLevel = level
     questInfo.questType = ControlCenter_DataProvider.GetQuestType(questID, questTagInfo, frequency, isRepeatable, isLegendary, isImportant)
     questInfo.questTagID = questTagInfo and questTagInfo.tagID
     questInfo.questTagName = questTagInfo and questTagInfo.tagName
@@ -625,11 +626,11 @@ do --Quest Info
             return
         end
 
-        return BuildPartialQuestInfo(questID, gossipData.title, gossipData.isTrivial, gossipData.isComplete, gossipData.frequency, gossipData.repeatable, gossipData.isLegendary, gossipData.isImportant)
+        return BuildPartialQuestInfo(questID, gossipData.title, gossipData.isTrivial, gossipData.isComplete, gossipData.frequency, gossipData.repeatable, gossipData.isLegendary, gossipData.isImportant, gossipData.questLevel)
     end
 
     function ControlCenter_DataProvider.BuildPartialQuestInfoFromGreetingOption(name, level, questID, isTrivial, isComplete, isLegendary, frequency, isRepeatable, isImportant)
-        return BuildPartialQuestInfo(questID or 0, name, isTrivial, isComplete, frequency, isRepeatable, isLegendary, isImportant)
+        return BuildPartialQuestInfo(questID or 0, name, isTrivial, isComplete, frequency, isRepeatable, isLegendary, isImportant, level)
     end
 end
 

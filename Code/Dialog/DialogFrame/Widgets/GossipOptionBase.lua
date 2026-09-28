@@ -1,13 +1,16 @@
 local env = select(2, ...)
+local Config = env.Config
+local L = env.L
 local Sound = env.modules:Import("packages\\sound")
 local UICSharedMixin = env.modules:Import("packages\\uic-sharedmixin")
-local InputUtil = env.modules:Import("@\\InputUtil")
+local InputHandler = env.modules:Import("packages\\input-handler")
 local ControlCenter_Preload = env.modules:Import("@\\Dialog\\ControlCenter\\Preload")
 local ControlCenter = env.modules:Import("@\\Dialog\\ControlCenter")
 local DialogFrame = env.modules:Await("@\\Dialog\\DialogFrame")
 local GossipOptionBase = env.modules:New("@\\Dialog\\DialogFrame\\Widgets\\GossipOptionBase")
 
 local CreateFromMixins = CreateFromMixins
+local format = string.format
 
 do -- Option
     local CONTENT_Y = 0
@@ -22,6 +25,7 @@ do -- Option
     function OptionMixin:OnLoad()
         self.optionType = nil
         self.optionKey = nil
+        self:SetSublabelText(nil)
 
         self:InitButton()
         self:RegisterMouseEvents()
@@ -38,6 +42,11 @@ do -- Option
 
     function OptionMixin:SetText(text)
         self.Label:SetText(text)
+    end
+
+    function OptionMixin:SetSublabelText(text)
+        self.Sublabel:SetText(text or "")
+        self.Sublabel:SetShown(text ~= nil and text ~= "")
     end
 
     function OptionMixin:SetImage(texture)
@@ -91,9 +100,11 @@ do -- Group
 
     function GossipOptionBase.OnOptionUpdate(element, index, value, alternate)
         local optionIndex = value.dialogOptionIndex
-        local showOptionIndex = optionIndex and InputUtil.GetInputDevice() == InputUtil.Enum.InputDevices.KBM
+        local showOptionIndex = optionIndex and InputHandler.GetInputDevice() == InputHandler.Enum.InputDevices.KBM
         local name = alternate and value.alternateName or value.name
+        local questLevel = value.questInfo and value.questInfo.questLevel
 
+        element:SetSublabelText(Config.DBGlobal:GetVariable("ShowQuestLevel") and questLevel and questLevel > 0 and format(L["DIALOG_QUEST_LEVEL"], questLevel) or nil)
         element:SetText((showOptionIndex and optionIndex .. ". " or "") .. name)
         element:SetImage(value.contextIcon or value.icon)
         element:SetTrivial(value.questInfo and value.questInfo.questIsTrivial)

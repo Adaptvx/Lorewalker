@@ -1,5 +1,4 @@
 local env = select(2, ...)
-local Enum = env.Enum
 local CallbackRegistry = env.modules:Import("packages\\callback-registry")
 local ControlCenter = env.modules:Import("@\\Dialog\\ControlCenter")
 local DialogFrame = env.modules:Import("@\\Dialog\\DialogFrame")
@@ -153,4 +152,4 @@ CallbackRegistry.Add(DialogFrame.Events.GossipOptionSelectionRequested, ClassicM
 CallbackRegistry.Add(DialogFrame.Events.QuestRewardSelectionRequested, ClassicMode.OnQuestRewardSelectionRequested)
 
 
-Modes_ModeHandler.RegisterMode(Enum.Mode.Classic, ClassicMode)
+Modes_ModeHandler.RegisterMode(env.Enum.Mode.Classic, ClassicMode)

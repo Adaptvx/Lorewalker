@@ -3,10 +3,10 @@ local L = env.L
 local Config = env.Config
 local Pool = env.modules:Import("packages\\pool")
 local CallbackRegistry = env.modules:Import("packages\\callback-registry")
+local SavedVariables = env.modules:Import("packages\\saved-variables")
 local Sound = env.modules:Import("packages\\sound")
 local UIKit = env.modules:Import("packages\\ui-kit")
 local UIAnim = env.modules:Import("packages\\ui-anim")
-local InputUtil = env.modules:Import("@\\InputUtil")
 local SharedUtil = env.modules:Import("@\\Dialog\\SharedUtil")
 local Modes_ModeHandler = env.modules:Await("@\\Dialog\\Modes\\ModeHandler")
 local Settings = env.modules:Await("@\\Settings")
@@ -165,7 +165,10 @@ function DialogFrameMixin:OnLoad()
         end
     end)
 
-    CallbackRegistry.Add("InputUtil.SetInputDevice", function()
+    CallbackRegistry.Add("InputHandler.InputDeviceChanged", function()
+        self:RefreshDialogOptionLabels()
+    end)
+    SavedVariables.OnChange("LorewalkerDB_Global", "ShowQuestLevel", function()
         self:RefreshDialogOptionLabels()
     end)
 
@@ -1097,13 +1100,13 @@ do --Footer
     end
 
     local BUTTON_TYPES = {
-        Goodbye    = { text = L["GOODBYE"], onClick = GoodbyeButton_OnClick, keybind = InputUtil.Enum.Actions.Close },
-        Cancel     = { text = L["CANCEL"], onClick = CancelButton_OnClick, keybind = InputUtil.Enum.Actions.Close },
-        Accept     = { text = L["ACCEPT"], onClick = AcceptButton_OnClick, keybind = InputUtil.Enum.Actions.Confirm },
-        AutoAccept = { text = L["AUTO_ACCEPT"], onClick = AutoAcceptButton_OnClick, keybind = InputUtil.Enum.Actions.Confirm },
-        Decline    = { text = L["DECLINE"], onClick = CancelButton_OnClick, keybind = InputUtil.Enum.Actions.Close },
-        Continue   = { text = L["CONTINUE"], onClick = ContinueButton_OnClick, keybind = InputUtil.Enum.Actions.Confirm },
-        Complete   = { text = L["COMPLETE"], onClick = CompleteButton_OnClick, keybind = InputUtil.Enum.Actions.Confirm }
+        Goodbye    = { text = L["GOODBYE"], onClick = GoodbyeButton_OnClick, keybind = env.Enum.Actions.Close },
+        Cancel     = { text = L["CANCEL"], onClick = CancelButton_OnClick, keybind = env.Enum.Actions.Close },
+        Accept     = { text = L["ACCEPT"], onClick = AcceptButton_OnClick, keybind = env.Enum.Actions.Confirm },
+        AutoAccept = { text = L["AUTO_ACCEPT"], onClick = AutoAcceptButton_OnClick, keybind = env.Enum.Actions.Confirm },
+        Decline    = { text = L["DECLINE"], onClick = CancelButton_OnClick, keybind = env.Enum.Actions.Close },
+        Continue   = { text = L["CONTINUE"], onClick = ContinueButton_OnClick, keybind = env.Enum.Actions.Confirm },
+        Complete   = { text = L["COMPLETE"], onClick = CompleteButton_OnClick, keybind = env.Enum.Actions.Confirm }
     }
 
     local LAYOUTS = {

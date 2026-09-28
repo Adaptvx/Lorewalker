@@ -1,5 +1,5 @@
 ## Interface: 20506
-## Version: 0.0.5 (Beta 5)
+## Version: 0.0.6 (Beta 6)
 ## Title: Lorewalker
 ## Notes: A modern questing experience.
 ## Author: AdaptiveX
@@ -16,7 +16,6 @@ Preload.lua
 Locales\Locales.xml
 Code\PlayerMovementFrameFader.lua
 Code\SharedUI.lua
-Code\InputUtil.lua
 Code\Tooltip.lua
 Code\StaticPopup.lua
 Code\HideUI.lua

@@ -1,5 +1,4 @@
 local env = select(2, ...)
-local Enum = env.Enum
 local Config = env.Config
 local Sound = env.modules:Import("packages\\sound")
 local CallbackRegistry = env.modules:Import("packages\\callback-registry")
@@ -294,7 +293,7 @@ function ChatBubbleMixin:OnMouseUp(button)
 end
 
 function ChatBubbleMixin:OnUpdate(elapsed)
-    if self.AnimGroup:IsPlaying(self, "HIDE") then return end
+    if not ImmersiveMode.isActive or self.AnimGroup:IsPlaying("HIDE") then return end
 
     local unit = ImmersiveModeUtil.GetInteractionUnit()
     local nameplate = GetNamePlateForUnit(unit)
@@ -718,7 +717,7 @@ end
 function ChatBubbleMixin:Close()
     self:CancelAutoProgress()
     self:StopTextPlayback(true)
-    if not self:IsShown() or self.AnimGroup:IsPlaying(self, "HIDE") then return end
+    if not self:IsShown() or self.AnimGroup:IsPlaying("HIDE") then return end
     self.AnimGroup:Stop()
     self.AnimGroup:Play(self, "HIDE"):onFinish(function() self:Hide() end)
 end
@@ -863,4 +862,4 @@ CallbackRegistry.Add(DialogFrame.Events.GossipOptionSelectionRequested, Immersiv
 CallbackRegistry.Add(DialogFrame.Events.QuestRewardSelectionRequested, ImmersiveMode.OnQuestRewardSelectionRequested)
 
 
-Modes_ModeHandler.RegisterMode(Enum.Mode.Immersive, ImmersiveMode)
+Modes_ModeHandler.RegisterMode(env.Enum.Mode.Immersive, ImmersiveMode)

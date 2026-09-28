@@ -161,9 +161,18 @@ do -- Tab
         Setting:OpenTabByIndex(self.__index)
     end
 
+    local function TabButton_FindFirstVisibleTabIndex()
+        for i, tabButton in ipairs(Settings_Constructor.TabButtons) do
+            if tabButton:IsShown() then
+                return i
+            end
+        end
+    end
+
     function Build.Tab(widgetInfo, parent)
         local name = widgetInfo.widgetName or ""
         local isFooter = widgetInfo.widgetTab_isFooter
+        local showWhen = widgetInfo.showWhen
 
         local tab = Settings_Widgets.Tab()
         tab:parent(parent)
@@ -180,6 +189,30 @@ do -- Tab
         -- Add to tab list
         tinsert(Settings_Constructor.Tabs, tab)
         tinsert(Settings_Constructor.TabButtons, tabButton)
+
+        if showWhen then
+            CallbackRegistry.Add("Setting.Refresh", function()
+                local shouldShow = showWhen()
+
+                if tabButton:IsShown() ~= shouldShow then
+                    tabButton:SetShown(shouldShow)
+                end
+
+                if shouldShow then return end
+                if not tabButton.isSelected then return end
+
+                local fallbackTabIndex = TabButton_FindFirstVisibleTabIndex()
+                if fallbackTabIndex then
+                    Setting:OpenTabByIndex(fallbackTabIndex)
+                    return
+                end
+
+                tabButton:SetSelected(false)
+                tab:Hide()
+            end)
+
+            tabButton:SetShown(showWhen())
+        end
 
         return tab, tab.Layout
     end
@@ -372,6 +405,68 @@ do -- Button
     end
 end
 
+do -- Binding Button
+    local function BindingButton_Refresh(self)
+        local options = self.__bindingOptions
+        local device = options.getDevice()
+        local binding = options.manager:GetBinding(self.__action, device)
+        local button = self:GetBindingButton()
+
+        if self.__bindingDevice ~= device then
+            button:StopCapture()
+            self.__bindingDevice = device
+        end
+
+        button:SetBinding(binding)
+        if not binding then button:SetText(NOT_BOUND) end
+    end
+
+    local function BindingButton_OnBinding(button, key, device)
+        local widget = button.__widgetRef
+        local options = widget.__bindingOptions
+        options.manager:SetBinding(widget.__action, device or options.getDevice(), key or false)
+        widget.__tab:_Render()
+    end
+
+    function Build.BindingButton(widgetInfo, parent, root, tab, options)
+        local action = assert(widgetInfo.widgetBindingButton_action, "Binding action is required!")
+        assert(options, "Binding options are required!")
+        local widget = Settings_Widgets.ElementBindingButton()
+        local button = widget:GetBindingButton()
+        widget:parent(parent)
+        Mixin(widget, WidgetMixin)
+        widget:OnLoad(widgetInfo, root, tab)
+        widget:SetUserInteractableObject(button)
+
+        widget.__action = action
+        widget.__bindingOptions = options
+        button.__widgetRef = widget
+        button:SetOnBinding(BindingButton_OnBinding)
+        button:SetBindingValidator(options.isAllowed)
+        button:SetTextFormattingFunc(options.textFormattingFunc)
+        widget:SetRefreshHandler(BindingButton_Refresh)
+        CallbackRegistry.Add("InputHandler.BindingChanged", function(_, changedManager, device, actions)
+            if changedManager ~= options.manager or (device and device ~= options.getDevice()) then return end
+
+            if not actions then
+                widget:Refresh(true)
+                return
+            end
+
+            for _, changedAction in ipairs(actions) do
+                if changedAction == action then
+                    widget:Refresh(true)
+                    return
+                end
+            end
+        end)
+        CallbackRegistry.Add("InputHandler.DisplayInputDeviceChanged", function() widget:Refresh(true) end)
+        BindingButton_Refresh(widget)
+
+        return widget
+    end
+end
+
 do -- Check Button
     local function CheckButton_Refresh(self, force)
         if not force and HasDBKeyValueChanged(self) == false then return end
@@ -428,13 +523,18 @@ do -- Selection Menu
     local function SelectionMenu_Refresh(self, force)
         if not force and HasDBKeyValueChanged(self) == false then return end
 
+        local selectionMenuData = self.__selectionMenuData
+        if selectionMenuData then
+            self:GetSelectionMenuButton():SetData(ResolveValueThatIsFunctionOrValue(selectionMenuData))
+        end
+
         local value = self:GetLocalValue()
 
         if self.__selectionMenuGetFunc then
             value = self.__selectionMenuGetFunc(value)
         end
 
-        self:GetSelectionMenuButton():SetValue(value)
+        self:GetSelectionMenuButton():SetValue(value, true)
     end
 
     local function SelectionMenu_OnValueChanged(self, value)
@@ -481,6 +581,7 @@ do -- Selection Menu
         widget.__setFunc = set
         widget.__selectionMenuGetFunc = selectionMenuGet
         widget.__selectionMenuSetFunc = selectionMenuSet
+        widget.__selectionMenuData = selectionMenuData
 
         selectionMenuButton:SetSelectionMenu(SettingFrame.SelectionMenu)
         selectionMenuButton:SetData(ResolveValueThatIsFunctionOrValue(selectionMenuData))
@@ -507,13 +608,19 @@ do -- Color Input
         widget.__lastValue.g = color.g
         widget.__lastValue.b = color.b
 
-        widget:SetLocalValue(color)
+        local value = {
+            r = color.r,
+            g = color.g,
+            b = color.b
+        }
+
+        widget:SetLocalValue(value)
         widget:PushLocalValueToDBKey()
         widget:Refresh(true)
 
         local setFunc = widget.__setFunc
         if setFunc then
-            setFunc(self, color)
+            setFunc(self, value)
         end
     end
 
@@ -617,33 +724,34 @@ local BUILD_MAP = {
     [Settings_Enum.WidgetType.Text]          = Build.Text,
     [Settings_Enum.WidgetType.Range]         = Build.Range,
     [Settings_Enum.WidgetType.Button]        = Build.Button,
+    [Settings_Enum.WidgetType.BindingButton] = Build.BindingButton,
     [Settings_Enum.WidgetType.CheckButton]   = Build.CheckButton,
     [Settings_Enum.WidgetType.SelectionMenu] = Build.SelectionMenu,
     [Settings_Enum.WidgetType.ColorInput]    = Build.ColorInput,
     [Settings_Enum.WidgetType.Input]         = Build.Input
 }
 
-local function BuildWidget(info, parent, root, tab)
+local function BuildWidget(info, parent, root, tab, options)
     local widgetType = info.widgetType
     local buildFunc = BUILD_MAP[widgetType]
 
     if not buildFunc then return end
 
-    local widget, contentFrame = buildFunc(info, parent, root, tab)
+    local widget, contentFrame = buildFunc(info, parent, root, tab, options)
     return widget, contentFrame
 end
 
-local function TraverseAndBuildWidgetsFromTable(widgetTable, parent, root, currentTab)
+local function TraverseAndBuildWidgetsFromTable(widgetTable, parent, root, currentTab, options)
     for _, info in ipairs(widgetTable) do
         local isTab = info.widgetType == Settings_Enum.WidgetType.Tab
 
-        local widget, contentFrame = BuildWidget(info, parent, root, currentTab)
+        local widget, contentFrame = BuildWidget(info, parent, root, currentTab, options)
         assert(widget, "Failed to build widget!")
 
         local nextTab = isTab and widget or currentTab
 
         if info.children then
-            TraverseAndBuildWidgetsFromTable(info.children, contentFrame or widget, widget, nextTab)
+            TraverseAndBuildWidgetsFromTable(info.children, contentFrame or widget, widget, nextTab, options)
         end
     end
 end
@@ -654,9 +762,9 @@ function Settings_Constructor:SetBuildTargetFrame(frame)
     buildTarget = frame
 end
 
-function Settings_Constructor:Build(origin)
+function Settings_Constructor:Build(origin, options)
     UIKit.BeginBatch()
-    TraverseAndBuildWidgetsFromTable(origin, buildTarget)
+    TraverseAndBuildWidgetsFromTable(origin, buildTarget, nil, nil, options)
     UIKit.EndBatch()
 end
 

@@ -4,13 +4,15 @@ local CallbackRegistry = env.modules:Import("packages\\callback-registry")
 local UIFont = env.modules:Import("packages\\ui-font")
 local SavedVariables = env.modules:Import("packages\\saved-variables")
 local Path = env.modules:Import("packages\\path")
+local InputHandler = env.modules:Import("packages\\input-handler")
+local WoWClient = env.modules:Import("packages\\wow-client")
 
 
 env.NAME = "Lorewalker"
 env.ICON = Path.Root .. "\\Art\\Icons\\Logo"
 env.ICON_ALT = Path.Root .. "\\Art\\Icons\\Logo-White"
-env.VERSION_STRING = "Beta 5"
-env.VERSION_NUMBER = 000005
+env.VERSION_STRING = "Beta 6"
+env.VERSION_NUMBER = 000006
 env.DEBUG_MODE = false
 
 
@@ -23,6 +25,10 @@ do
         Light = 1,
         Dark  = 2
     }
+    Enum.FrameTheme = {
+        Default = 1,
+        Forever = 2
+    }
     Enum.Mode = {
         Classic   = 1,
         Immersive = 2,
@@ -33,6 +39,86 @@ do
         Full     = 2,
         Balanced = 3,
         Custom   = 4
+    }
+    Enum.Actions = {
+        Confirm        = 1,
+        Close          = 2,
+        ScrollDown     = 3,
+        ScrollUp       = 4,
+        ScrollLeft     = 5,
+        ScrollRight    = 6,
+        PreviousDialog = 7,
+        NextDialog     = 8,
+        SelectOption1  = 9,
+        SelectOption2  = 10,
+        SelectOption3  = 11,
+        SelectOption4  = 12,
+        SelectOption5  = 13,
+        SelectOption6  = 14,
+        SelectOption7  = 15,
+        SelectOption8  = 16,
+        SelectOption9  = 17
+    }
+    Enum.DefaultKeybindings = {
+        [Enum.Actions.Confirm]        = {
+            [InputHandler.Enum.InputDevices.KBM]     = "SPACE",
+            [InputHandler.Enum.InputDevices.GamePad] = "PAD1"
+        },
+        [Enum.Actions.Close]          = {
+            [InputHandler.Enum.InputDevices.KBM]     = "ESCAPE",
+            [InputHandler.Enum.InputDevices.GamePad] = "PAD2"
+        },
+        [Enum.Actions.ScrollDown]     = {
+            [InputHandler.Enum.InputDevices.KBM]     = "DOWN",
+            [InputHandler.Enum.InputDevices.GamePad] = "PADDDOWN"
+        },
+        [Enum.Actions.ScrollUp]       = {
+            [InputHandler.Enum.InputDevices.KBM]     = "UP",
+            [InputHandler.Enum.InputDevices.GamePad] = "PADDUP"
+        },
+        [Enum.Actions.ScrollLeft]     = {
+            [InputHandler.Enum.InputDevices.KBM]     = "LEFT",
+            [InputHandler.Enum.InputDevices.GamePad] = "PADDLEFT"
+        },
+        [Enum.Actions.ScrollRight]    = {
+            [InputHandler.Enum.InputDevices.KBM]     = "RIGHT",
+            [InputHandler.Enum.InputDevices.GamePad] = "PADDRIGHT"
+        },
+        [Enum.Actions.PreviousDialog] = {
+            [InputHandler.Enum.InputDevices.KBM]     = "Q",
+            [InputHandler.Enum.InputDevices.GamePad] = "PADLSHOULDER"
+        },
+        [Enum.Actions.NextDialog]     = {
+            [InputHandler.Enum.InputDevices.KBM]     = "E",
+            [InputHandler.Enum.InputDevices.GamePad] = "PADRSHOULDER"
+        },
+        [Enum.Actions.SelectOption1]  = {
+            [InputHandler.Enum.InputDevices.KBM] = "1"
+        },
+        [Enum.Actions.SelectOption2]  = {
+            [InputHandler.Enum.InputDevices.KBM] = "2"
+        },
+        [Enum.Actions.SelectOption3]  = {
+            [InputHandler.Enum.InputDevices.KBM] = "3"
+        },
+        [Enum.Actions.SelectOption4]  = {
+            [InputHandler.Enum.InputDevices.KBM] = "4"
+        },
+        [Enum.Actions.SelectOption5]  = {
+            [InputHandler.Enum.InputDevices.KBM] = "5"
+        },
+        [Enum.Actions.SelectOption6]  = {
+            [InputHandler.Enum.InputDevices.KBM] = "6"
+        },
+        [Enum.Actions.SelectOption7]  = {
+            [InputHandler.Enum.InputDevices.KBM] = "7"
+        },
+        [Enum.Actions.SelectOption8]  = {
+            [InputHandler.Enum.InputDevices.KBM] = "8"
+        },
+        [Enum.Actions.SelectOption9]  = {
+            [InputHandler.Enum.InputDevices.KBM] = "9"
+        }
     }
 end
 
@@ -73,11 +159,14 @@ do
         userKeybinds = {},
 
         Theme                                              = Enum.Theme.Light,
+        FrameTheme                                         = WoWClient.IS_FOREVER and Enum.FrameTheme.Forever or Enum.FrameTheme.Default,
         ActiveMode                                         = Enum.Mode.Classic,
+        BindingDevice                                      = InputHandler.Enum.InputDevices.KBM,
 
         DialogFontSizeOffset                               = 1, --100%
         ChatBubbleFontSizeOffset                           = 1, --100%
-        ConfirmUseInteractKey                              = false,
+        LockFramePositions                                 = false,
+        ConfirmUseInteractKey                              = true,
 
         HideUI                                             = false,
         CameraEffectsPreset                                = Enum.CameraEffectsPreset.None,
@@ -92,20 +181,21 @@ do
         CameraEffects_FocusInteractTargetPitchStrength     = nil,
         CameraEffects_FocusInteractTargetYawStrength       = nil,
 
-        ForceGossip                           = false,
-        CloseToPreviousPage                   = false,
-        RightClickToClose                     = true,
-        Immersive_SplitParagraphs             = true,
-        Immersive_Playback                    = false,
-        Immersive_PlaybackSpeed               = 1,
-        Immersive_PlaybackAutoProgress        = true,
-        Immersive_PlaybackAutoProgressDelay   = 1,
-        Immersive_PlaybackPunctuationPausing  = true,
-        Immersive_PlaybackAutoClose           = true,
-        Immersive_ContentPreviewAlpha         = .5,
-        Story_PlaybackSpeed                   = 1,
+        ForceGossip                                        = false,
+        ShowQuestLevel                                     = WoWClient.IS_FOREVER or WoWClient.IS_CLASSIC_ERA,
+        CloseToPreviousPage                                = false,
+        RightClickToClose                                  = true,
+        Immersive_SplitParagraphs                          = true,
+        Immersive_Playback                                 = false,
+        Immersive_PlaybackSpeed                            = 1,
+        Immersive_PlaybackAutoProgress                     = true,
+        Immersive_PlaybackAutoProgressDelay                = 1,
+        Immersive_PlaybackPunctuationPausing               = true,
+        Immersive_PlaybackAutoClose                        = true,
+        Immersive_ContentPreviewAlpha                      = .5,
+        Story_PlaybackSpeed                                = 1,
 
-        AudioGlobal                           = true,
+        AudioGlobal                                        = true,
     }
     local DB_GLOBAL_PERSISTENT_DEFAULTS = {}
     local DB_LOCAL_DEFAULTS             = {}
@@ -202,6 +292,11 @@ do
         UpdateFonts()
         UpdateFontSizes()
     end
+end
+
+
+do --Input
+    InputHandler.Keybindings = InputHandler.NewBindingManager(Enum.Actions, Enum.DefaultKeybindings, function() return Config.DBGlobal end, "userKeybinds")
 end
 
 

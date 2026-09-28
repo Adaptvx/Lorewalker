@@ -1,15 +1,18 @@
 local env = select(2, ...)
+local Config = env.Config
 local Path = env.modules:Import("packages\\path")
 local GenericEnum = env.modules:Import("packages\\generic-enum")
 local Sound = env.modules:Import("packages\\sound")
 local CallbackRegistry = env.modules:Import("packages\\callback-registry")
+local SavedVariables = env.modules:Import("packages\\saved-variables")
 local UIFont = env.modules:Import("packages\\ui-font")
 local UIKit = env.modules:Import("packages\\ui-kit")
 local Frame, LayoutGrid, LayoutHorizontal, LayoutVertical, Text, ScrollContainer, LazyScrollContainer, ScrollBar, ScrollContainerEdge, Input, LinearSlider, HitRect, List, SecureButton, ModelScene = unpack(UIKit.UI.Frames)
 local UIAnim = env.modules:Import("packages\\ui-anim")
 local UICSharedMixin = env.modules:Import("packages\\uic-sharedmixin")
 local UICCommon = env.modules:Import("packages\\uic-common")
-local InputUtil = env.modules:Import("@\\InputUtil")
+local InputHandler = env.modules:Import("packages\\input-handler")
+local SharedUtil = env.modules:Import("@\\Dialog\\SharedUtil")
 local Dialog_Preload = env.modules:Import("@\\Dialog\\Preload")
 local Dialog_UIWidgets = env.modules:New("@\\Dialog\\UIWidgets")
 
@@ -108,27 +111,6 @@ do -- Quest NPC Model Scene
 end
 
 do -- Hotkey Frame
-    local HOTKEY_REPLACEMENT_MAP = {
-        ESCAPE       = { text = "ESC" },
-        SPACE        = { icon = Path.Root .. "\\Art\\Hotkeys\\Space", noFrame = false },
-        PADLSHOULDER = { icon = Path.Root .. "\\Art\\Hotkeys\\LB", noFrame = true },
-        PADRSHOULDER = { icon = Path.Root .. "\\Art\\Hotkeys\\RB", noFrame = true },
-        PADLTRIGGER  = { icon = Path.Root .. "\\Art\\Hotkeys\\LT", noFrame = true },
-        PADRTRIGGER  = { icon = Path.Root .. "\\Art\\Hotkeys\\RT", noFrame = true }
-    }
-    local HOTKEY_REPLACEMENT_MAP_XBOX = {
-        PAD1 = { icon = Path.Root .. "\\Art\\Hotkeys\\XBOX-P1", noFrame = true },
-        PAD2 = { icon = Path.Root .. "\\Art\\Hotkeys\\XBOX-P2", noFrame = true },
-        PAD3 = { icon = Path.Root .. "\\Art\\Hotkeys\\XBOX-P3", noFrame = true },
-        PAD4 = { icon = Path.Root .. "\\Art\\Hotkeys\\XBOX-P4", noFrame = true }
-    }
-    local HOTKEY_REPLACEMENT_MAP_PS = {
-        PAD1 = { icon = Path.Root .. "\\Art\\Hotkeys\\PS-P1", noFrame = true },
-        PAD2 = { icon = Path.Root .. "\\Art\\Hotkeys\\PS-P2", noFrame = true },
-        PAD3 = { icon = Path.Root .. "\\Art\\Hotkeys\\PS-P3", noFrame = true },
-        PAD4 = { icon = Path.Root .. "\\Art\\Hotkeys\\PS-P4", noFrame = true }
-    }
-
     local TEXTURE = UIKit.Define.Texture_NineSlice{ path = Path.Root .. "\\Art\\Dialog\\Shared\\HotkeyFrame", inset = 32, scale = 0.25, sliceMode = Enum.UITextureSliceMode.Tiled }
     local SIZE = UIKit.Define.Fit{ delta = 10 }
     local SIZE_ICON_FRAME = UIKit.Define.Fit{ delta = 4 }
@@ -137,57 +119,83 @@ do -- Hotkey Frame
 
     function HotkeyFrameMixin:OnLoad()
         self:WatchKeybind()
+        self:RegisterEvent("UPDATE_BINDINGS")
+        self:SetScript("OnEvent", function() self:UpdateHotkey() end)
     end
 
     function HotkeyFrameMixin:WatchKeybind()
-        CallbackRegistry.Add("InputUtil.SetKeybind", function(_, action, key) self:UpdateHotkey(action, key) end)
-        CallbackRegistry.Add("InputUtil.SetInputDevice", function() self:UpdateHotkey() end)
-        CallbackRegistry.Add("InputUtil.SetDisplayInputDevice", function() self:UpdateHotkey() end)
+        CallbackRegistry.Add("InputHandler.BindingChanged", function(_, manager, device, actions)
+            if manager ~= InputHandler.Keybindings then return end
+            if device and device ~= InputHandler.GetInputDevice() then return end
+
+            if not actions then
+                self:UpdateHotkey()
+                return
+            end
+
+            for _, action in ipairs(actions) do
+                if action == self.action then
+                    self:UpdateHotkey(action)
+                    return
+                end
+            end
+        end)
+        CallbackRegistry.Add("InputHandler.InputDeviceChanged", function() self:UpdateHotkey() end)
+        CallbackRegistry.Add("InputHandler.DisplayInputDeviceChanged", function() self:UpdateHotkey() end)
+        SavedVariables.OnChange("LorewalkerDB_Global", "ConfirmUseInteractKey", function() self:UpdateHotkey() end)
     end
 
-    function HotkeyFrameMixin:UpdateHotkey(action, key)
-        if (not action and not key) or (action == self.action and key ~= self.key) then
+    function HotkeyFrameMixin:UpdateHotkey(action)
+        if not action or action == self.action then
             self:SetHotkey(action or self.action)
         end
     end
 
     function HotkeyFrameMixin:SetHotkey(action)
         if not action then
+            self.action = nil
             self:Hide()
             return
         end
 
         self.action = action
-        self.key = InputUtil.GetKeybind(action)
-
-        if self.key then
-            local replacement = HOTKEY_REPLACEMENT_MAP[self.key]
-            if InputUtil:GetDisplayInputDevice() == InputUtil.Enum.DisplayInputDevices.Xbox then
-                replacement = HOTKEY_REPLACEMENT_MAP_XBOX[self.key] or replacement
-            elseif InputUtil:GetDisplayInputDevice() == InputUtil.Enum.DisplayInputDevices.PS then
-                replacement = HOTKEY_REPLACEMENT_MAP_PS[self.key] or replacement
-            end
-
-            local noFrame = replacement and replacement.noFrame or false
-            local useIcon = replacement and replacement.icon
-
-            if useIcon then
-                local iconSize = noFrame and 22 or 16
-                self.Icon:SetSize(iconSize, iconSize)
-                self.Icon:SetAlpha(noFrame and 1 or 0.75)
-                self.IconTexture:SetTexture(replacement.icon)
-            else
-                self.Text:SetText(replacement and replacement.text or self.key)
-            end
-
-            local frameSize = useIcon and SIZE_ICON_FRAME or SIZE
-            self:size(frameSize, frameSize)
-            self.Frame:SetShown(not noFrame)
-            self.Text:SetShown(not useIcon)
-            self.Icon:SetShown(useIcon)
-            self:Show()
-            self:_Render()
+        if action == env.Enum.Actions.Confirm and Config.DBGlobal:GetVariable("ConfirmUseInteractKey") then
+            local key1, key2 = GetBindingKey("INTERACTTARGET")
+            local isGamePad = InputHandler.GetInputDevice() == InputHandler.Enum.InputDevices.GamePad
+            self.key = nil
+            if key1 and (key1:sub(1, 3) == "PAD") == isGamePad then self.key = key1 end
+            if not self.key and key2 and (key2:sub(1, 3) == "PAD") == isGamePad then self.key = key2 end
+        else
+            self.key = InputHandler.Keybindings:GetBinding(action)
         end
+
+        if not self.key then
+            self:Hide()
+            return
+        end
+
+        local replacement = SharedUtil.GetHotkeyReplacement(self.key)
+
+        local noFrame = replacement and replacement.noFrame or false
+        local useIcon = replacement and replacement.icon
+
+        if useIcon then
+            local iconSize = noFrame and 22 or 16
+            self.Icon:SetSize(iconSize, iconSize)
+            self.Icon:SetAlpha(noFrame and 1 or 0.75)
+            self.IconTexture:SetTexture(replacement.icon)
+        else
+            local _, fontHeight, _ = self.Text:GetFont()
+            self.Text:SetText(SharedUtil.GetHotkeyText(self.key, nil, fontHeight + 4))
+        end
+
+        local frameSize = useIcon and SIZE_ICON_FRAME or SIZE
+        self:size(frameSize, frameSize)
+        self.Frame:SetShown(not noFrame)
+        self.Text:SetShown(not useIcon)
+        self.Icon:SetShown(useIcon)
+        self:Show()
+        self:_Render()
     end
 
     Dialog_UIWidgets.HotkeyFrame = UIKit.Template(function(id, name, children, ...)
@@ -236,30 +244,41 @@ end
 
 do -- Hotkey Button
     local TEXT_ENABLED_X = 5
-    local TEXT_DISABLED_X = 25
+    local TEXT_WIDTH = UIKit.Define.Percentage{ value = 100, operator = "-", delta = function(frame)
+        local contentFrame = frame:GetParent()
+        local hotkeyFrame = contentFrame:GetParent().HotkeyFrame
+        return math.min(contentFrame:GetWidth(), hotkeyFrame:GetWidth() + TEXT_ENABLED_X)
+    end }
 
     local HotkeyButtonMixin = {}
+
+    function HotkeyButtonMixin:HotkeyButton_OnLoad()
+        hooksecurefunc(self.HotkeyFrame, "SetHotkey", function()
+            self:HotkeyButton_UpdateLayout(self.HotkeyFrame:IsShown())
+        end)
+    end
 
     function HotkeyButtonMixin:HotkeyButton_UpdateLayout(hasKeybind)
         if hasKeybind then
             self.Text
                 :anchor(self.HotkeyFrame)
+                :width(TEXT_WIDTH)
                 :x(TEXT_ENABLED_X)
                 :point(UIKit.Enum.Point.Left, UIKit.Enum.Point.Right)
                 :textJustifyH("LEFT")
         else
             self.Text
                 :anchor(self.Content)
-                :x(TEXT_DISABLED_X)
-                :point(UIKit.Enum.Point.Left)
-                :textJustifyH("LEFT")
+                :width(UIKit.UI.P_FILL)
+                :x(0)
+                :point(UIKit.Enum.Point.Center)
+                :textJustifyH("CENTER")
         end
         self.Text:_Render()
     end
 
     function HotkeyButtonMixin:SetHotkey(text)
         self.HotkeyFrame:SetHotkey(text)
-        self:HotkeyButton_UpdateLayout(text ~= nil)
     end
 
     function HotkeyButtonMixin:SetHotkeyIcon(texture)
@@ -285,6 +304,7 @@ do -- Hotkey Button
             :textJustifyH("CENTER")
 
         Mixin(frame, HotkeyButtonMixin)
+        frame:HotkeyButton_OnLoad()
 
         return frame
     end)
@@ -306,6 +326,7 @@ do -- Hotkey Button
             :textJustifyH("CENTER")
 
         Mixin(frame, HotkeyButtonMixin)
+        frame:HotkeyButton_OnLoad()
 
         return frame
     end)

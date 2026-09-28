@@ -136,6 +136,7 @@ ControlCenter_Preload.SessionInfo = {
     QuestInfo  = Struct{
         questLore                               = "",
         questName                               = "",
+        questLevel                              = nil,
         questType                               = nil,
         questTagID                              = nil,
         questTagName                            = nil,

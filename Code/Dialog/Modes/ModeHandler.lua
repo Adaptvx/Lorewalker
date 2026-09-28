@@ -1,6 +1,5 @@
 local env = select(2, ...)
 local Config = env.Config
-local Enum = env.Enum
 local CallbackRegistry = env.modules:Import("packages\\callback-registry")
 local Modes_ModeHandler = env.modules:New("@\\Dialog\\Modes\\ModeHandler")
 
@@ -64,7 +63,7 @@ end
 
 CallbackRegistry.Add("Preload.AddonReady", function()
     local modeID = Config.DBGlobal:GetVariable("ActiveMode")
-    if not Modes_ModeHandler.modes[modeID] then modeID = Enum.Mode.Classic end
+    if not Modes_ModeHandler.modes[modeID] then modeID = env.Enum.Mode.Classic end
     Modes_ModeHandler.SetMode(modeID)
 end)
 

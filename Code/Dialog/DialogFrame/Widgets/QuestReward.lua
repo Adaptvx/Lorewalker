@@ -6,7 +6,7 @@ local UIKit = env.modules:Import("packages\\ui-kit")
 local Frame, LayoutGrid, LayoutHorizontal, LayoutVertical, Text, ScrollContainer, LazyScrollContainer, ScrollBar, ScrollContainerEdge, Input, LinearSlider, HitRect, List, SecureButton, ModelScene = unpack(UIKit.UI.Frames)
 local UICSharedMixin = env.modules:Import("packages\\uic-sharedmixin")
 local Dialog_UIWidgets = env.modules:Import("@\\Dialog\\UIWidgets")
-local InputUtil = env.modules:Import("@\\InputUtil")
+local InputHandler = env.modules:Import("packages\\input-handler")
 local HideUI = env.modules:Import("@\\HideUI")
 local ControlCenter_ContextIcon = env.modules:Import("@\\Dialog\\ControlCenter\\ContextIcon")
 local ControlCenter_OptionFlags = env.modules:Import("@\\Dialog\\ControlCenter\\OptionFlags")
@@ -112,7 +112,7 @@ local function ApplyRewardDisplay(frame, rewardInfo, optionIndex)
     local texture, quality, name, amountText = GetRewardDisplayInfo(frame.rewardButtonType, rewardInfo)
     local hasWarbandRewardContext = IsQuestRewardContextFlagSet(rewardInfo, FIRST_COMPLETION_BONUS) or IsQuestRewardContextFlagSet(rewardInfo, REPEAT_COMPLETION_BONUS)
 
-    if optionIndex and optionIndex <= 9 and InputUtil.GetInputDevice() == InputUtil.Enum.InputDevices.KBM then
+    if optionIndex and optionIndex <= 9 and InputHandler.GetInputDevice() == InputHandler.Enum.InputDevices.KBM then
         name = optionIndex .. ". " .. name
     end
 
@@ -120,6 +120,14 @@ local function ApplyRewardDisplay(frame, rewardInfo, optionIndex)
         frame.Item:SetSpell(texture)
     else
         frame.Item:SetItem(texture, quality)
+    end
+
+    if frame.rewardButtonType == DialogFrame_Preload.Enum.RewardButtonType.Item then
+        if rewardInfo.isUsable == false then
+            frame.Item.ItemTexture:SetColor(0.9, 0, 0)
+        else
+            frame.Item.ItemTexture:SetColor(1, 1, 1)
+        end
     end
 
     frame.Item:SetAmount(amountText)

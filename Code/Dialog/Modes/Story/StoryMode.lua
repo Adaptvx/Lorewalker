@@ -1,8 +1,8 @@
 local env = select(2, ...)
 local L = env.L
-local Enum = env.Enum
 local Config = env.Config
 local CallbackRegistry = env.modules:Import("packages\\callback-registry")
+local SavedVariables = env.modules:Import("packages\\saved-variables")
 local UIAnim = env.modules:Import("packages\\ui-anim")
 local ControlCenter = env.modules:Import("@\\Dialog\\ControlCenter")
 local ControlCenter_ContextIcon = env.modules:Import("@\\Dialog\\ControlCenter\\ContextIcon")
@@ -556,7 +556,10 @@ function StoryOptionsBoxMixin:OnLoad()
     end)
     SharedUtil.InitializeBoundsForFrame(self, "storyOptionsBoxBounds", self.HitRect, 2)
 
-    CallbackRegistry.Add("InputUtil.SetInputDevice", function()
+    CallbackRegistry.Add("InputHandler.InputDeviceChanged", function()
+        if self:IsActive() then self:RefreshOptions() end
+    end)
+    SavedVariables.OnChange("LorewalkerDB_Global", "ShowQuestLevel", function()
         if self:IsActive() then self:RefreshOptions() end
     end)
     CallbackRegistry.Add("WoWClient.OnUIScaleChanged", function()
@@ -756,4 +759,4 @@ CallbackRegistry.Add(DialogFrame.Events.GossipOptionSelectionRequested, StoryMod
 CallbackRegistry.Add(DialogFrame.Events.QuestRewardSelectionRequested, StoryMode.OnQuestRewardSelectionRequested)
 
 
-Modes_ModeHandler.RegisterMode(Enum.Mode.Story, StoryMode)
+Modes_ModeHandler.RegisterMode(env.Enum.Mode.Story, StoryMode)

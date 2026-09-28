@@ -42,6 +42,9 @@
     Input:
         widgetInput_placeholder:        string|function
 
+    Binding Button:
+        widgetBindingButton_action:     env.Enum.Actions
+
     disableWhen:                        function
     showWhen:                           function
     indent:                             number
@@ -52,16 +55,36 @@ local env = select(2, ...)
 local Config = env.Config
 local L = env.L
 local UIFont = env.modules:Import("packages\\ui-font")
+local InputHandler = env.modules:Import("packages\\input-handler")
+local SharedUtil = env.modules:Import("@\\Dialog\\SharedUtil")
 local Modes_ModeHandler = env.modules:Import("@\\Dialog\\Modes\\ModeHandler")
 local Settings_Define = env.modules:Import("@\\Settings\\Define")
 local Settings_Enum = env.modules:Import("@\\Settings\\Enum")
 local Settings_Preload = env.modules:Import("@\\Settings\\Preload")
 local Settings_Schema = env.modules:New("@\\Settings\\Schema")
 
+Settings_Schema.BINDING_BUTTON_OPTIONS = {
+    manager = InputHandler.Keybindings,
+    textFormattingFunc = SharedUtil.GetHotkeyText,
+    getDevice = function()
+        return Config.DBGlobal:GetVariable("BindingDevice")
+    end,
+    isAllowed = function(key, device)
+        return device == Config.DBGlobal:GetVariable("BindingDevice") and not key:find("BUTTON%d+") and not key:find("MOUSEWHEEL")
+    end
+}
+
 local SettingsPrompt = _G[Settings_Preload.FRAME_NAME].Prompt
 
 local function HandleAccept()
     Config.DBGlobal:Wipe()
+    ReloadUI()
+end
+
+local function HandleRestorePositionsAccept()
+    Config.DBGlobal:SetVariable("dialogFrameBounds", nil)
+    Config.DBGlobal:SetVariable("immersiveChatBubbleBounds", nil)
+    Config.DBGlobal:SetVariable("storyDialogBoxBounds", nil)
     ReloadUI()
 end
 
@@ -81,8 +104,25 @@ local RESET_PROMPT = {
     timeout      = 10
 }
 
+local RESTORE_POSITIONS_PROMPT = {
+    text         = L["CONFIG_APPEARANCE_POSITION_RESTOREPOSITIONS_PROMPT"],
+    options      = {
+        {
+            text     = L["CONFIG_APPEARANCE_POSITION_RESTOREPOSITIONS_PROMPT_YES"],
+            callback = HandleRestorePositionsAccept
+        },
+        {
+            text     = L["CONFIG_APPEARANCE_POSITION_RESTOREPOSITIONS_PROMPT_NO"],
+            callback = nil
+        }
+    },
+    hideOnEscape = true,
+    timeout      = 10
+}
+
 do -- Schema
     local function FormatPercentage(value) return string.format("%0.0f", value * 100) .. "%" end
+    local function IsKeyboardBindingDevice() return Config.DBGlobal:GetVariable("BindingDevice") == InputHandler.Enum.InputDevices.KBM end
 
     Settings_Schema.SCHEMA = {
         {
@@ -143,27 +183,29 @@ do -- Schema
                     key                      = "ActiveMode"
                 },
                 {
+                    widgetName = L["CONFIG_DIALOGUE_PREFERENCES"],
+                    widgetType = Settings_Enum.WidgetType.Container,
+                    children   = {
+                        {
+                            widgetName = L["CONFIG_DIALOGUE_PREFERENCES_FORCEGOSSIP"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "ForceGossip"
+                        },
+                        {
+                            widgetName = L["CONFIG_DIALOGUE_PREFERENCES_SHOWQUESTLEVEL"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "ShowQuestLevel"
+                        }
+                    }
+                },
+                {
                     widgetName = L["CONFIG_DIALOGUE_FRAME"],
                     widgetType = Settings_Enum.WidgetType.Container,
                     children   = {
                         {
-                            widgetName               = L["CONFIG_DIALOGUE_THEME"],
-                            widgetType               = Settings_Enum.WidgetType.SelectionMenu,
-                            widgetSelectionMenu_data = {
-                                L["CONFIG_DIALOGUE_THEME_LIGHT"],
-                                L["CONFIG_DIALOGUE_THEME_DARK"]
-                            },
-                            key                      = "Theme"
-                        },
-                        {
                             widgetName = L["CONFIG_DIALOGUE_RIGHTCLICKTOCLOSE"],
                             widgetType = Settings_Enum.WidgetType.CheckButton,
                             key        = "RightClickToClose"
-                        },
-                        {
-                            widgetName = L["CONFIG_DIALOGUE_FORCEGOSSIP"],
-                            widgetType = Settings_Enum.WidgetType.CheckButton,
-                            key        = "ForceGossip"
                         },
                         {
                             widgetName        = L["CONFIG_DIALOGUE_CLOSETOPREVIOUSPAGE"],
@@ -217,8 +259,110 @@ do -- Schema
             widgetType = Settings_Enum.WidgetType.Tab,
             children   = {
                 {
-                    widgetName = L["WIP"],
-                    widgetType = Settings_Enum.WidgetType.Text
+                    widgetType               = Settings_Enum.WidgetType.SelectionMenu,
+                    widgetTransparent        = true,
+                    widgetSelectionMenu_data = {
+                        L["CONFIG_KEYBINDINGS_DEVICE_KBM"],
+                        L["CONFIG_KEYBINDINGS_DEVICE_GAMEPAD"]
+                    },
+                    key                      = "BindingDevice"
+                },
+                {
+                    widgetName = L["CONFIG_KEYBINDINGS_ACTIONS"],
+                    widgetType = Settings_Enum.WidgetType.Container,
+                    children   = {
+                        {
+                            widgetName                 = L["CONFIG_KEYBINDINGS_CONFIRM"],
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.Confirm,
+                            disableWhen                = function() return Config.DBGlobal:GetVariable("ConfirmUseInteractKey") end
+                        },
+                        {
+                            widgetName = L["CONFIG_KEYBINDINGS_CONFIRM_USEINTERACTKEY"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "ConfirmUseInteractKey",
+                            indent     = 1
+                        },
+                        {
+                            widgetName                 = L["CONFIG_KEYBINDINGS_CLOSE"],
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.Close
+                        },
+                        {
+                            widgetName                 = L["CONFIG_KEYBINDINGS_SCROLLDOWN"],
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.ScrollDown
+                        },
+                        {
+                            widgetName                 = L["CONFIG_KEYBINDINGS_SCROLLUP"],
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.ScrollUp
+                        },
+                        {
+                            widgetName                 = L["CONFIG_KEYBINDINGS_PREVIOUSDIALOG"],
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.PreviousDialog
+                        },
+                        {
+                            widgetName                 = L["CONFIG_KEYBINDINGS_NEXTDIALOG"],
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.NextDialog
+                        },
+                        {
+                            widgetName                 = string.format(L["CONFIG_KEYBINDINGS_SELECTOPTION"], 1),
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.SelectOption1,
+                            showWhen                   = IsKeyboardBindingDevice
+                        },
+                        {
+                            widgetName                 = string.format(L["CONFIG_KEYBINDINGS_SELECTOPTION"], 2),
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.SelectOption2,
+                            showWhen                   = IsKeyboardBindingDevice
+                        },
+                        {
+                            widgetName                 = string.format(L["CONFIG_KEYBINDINGS_SELECTOPTION"], 3),
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.SelectOption3,
+                            showWhen                   = IsKeyboardBindingDevice
+                        },
+                        {
+                            widgetName                 = string.format(L["CONFIG_KEYBINDINGS_SELECTOPTION"], 4),
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.SelectOption4,
+                            showWhen                   = IsKeyboardBindingDevice
+                        },
+                        {
+                            widgetName                 = string.format(L["CONFIG_KEYBINDINGS_SELECTOPTION"], 5),
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.SelectOption5,
+                            showWhen                   = IsKeyboardBindingDevice
+                        },
+                        {
+                            widgetName                 = string.format(L["CONFIG_KEYBINDINGS_SELECTOPTION"], 6),
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.SelectOption6,
+                            showWhen                   = IsKeyboardBindingDevice
+                        },
+                        {
+                            widgetName                 = string.format(L["CONFIG_KEYBINDINGS_SELECTOPTION"], 7),
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.SelectOption7,
+                            showWhen                   = IsKeyboardBindingDevice
+                        },
+                        {
+                            widgetName                 = string.format(L["CONFIG_KEYBINDINGS_SELECTOPTION"], 8),
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.SelectOption8,
+                            showWhen                   = IsKeyboardBindingDevice
+                        },
+                        {
+                            widgetName                 = string.format(L["CONFIG_KEYBINDINGS_SELECTOPTION"], 9),
+                            widgetType                 = Settings_Enum.WidgetType.BindingButton,
+                            widgetBindingButton_action = env.Enum.Actions.SelectOption9,
+                            showWhen                   = IsKeyboardBindingDevice
+                        }
+                    }
                 }
             }
         },
@@ -227,9 +371,44 @@ do -- Schema
             widgetType = Settings_Enum.WidgetType.Tab,
             children   = {
                 {
+                    widgetName = L["CONFIG_APPEARANCE_POSITION"],
+                    widgetType = Settings_Enum.WidgetType.Container,
+                    children   = {
+                        {
+                            widgetName = L["CONFIG_APPEARANCE_POSITION_LOCKFRAMEPOSITIONS"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "LockFramePositions"
+                        },
+                        {
+                            widgetName        = nil,
+                            widgetType        = Settings_Enum.WidgetType.Button,
+                            widgetButton_text = L["CONFIG_APPEARANCE_POSITION_RESTOREPOSITIONS"],
+                            set               = function() SettingsPrompt:Open(RESTORE_POSITIONS_PROMPT) end
+                        }
+                    }
+                },
+                {
                     widgetName = L["CONFIG_APPEARANCE_DIALOG"],
                     widgetType = Settings_Enum.WidgetType.Container,
                     children   = {
+                        {
+                            widgetName               = L["CONFIG_APPEARANCE_DIALOG_THEME"],
+                            widgetType               = Settings_Enum.WidgetType.SelectionMenu,
+                            widgetSelectionMenu_data = {
+                                L["CONFIG_APPEARANCE_DIALOG_THEME_LIGHT"],
+                                L["CONFIG_APPEARANCE_DIALOG_THEME_DARK"]
+                            },
+                            key                      = "Theme"
+                        },
+                        {
+                            widgetName               = L["CONFIG_APPEARANCE_DIALOG_FRAMETHEME"],
+                            widgetType               = Settings_Enum.WidgetType.SelectionMenu,
+                            widgetSelectionMenu_data = {
+                                L["CONFIG_APPEARANCE_DIALOG_FRAMETHEME_DEFAULT"],
+                                L["CONFIG_APPEARANCE_DIALOG_FRAMETHEME_FOREVER"]
+                            },
+                            key                      = "FrameTheme"
+                        },
                         {
                             widgetName                     = L["CONFIG_APPEARANCE_DIALOG_FONTSIZE"],
                             widgetType                     = Settings_Enum.WidgetType.Range,
@@ -306,7 +485,7 @@ do -- Schema
                         {
                             widgetName        = L["CONTRIBUTORS_LANJIAN625"],
                             widgetType        = Settings_Enum.WidgetType.Text,
-                            widgetDescription = Settings_Define.Descriptor{ description = L["CONTRIBUTORS_LANJIAN625"] },
+                            widgetDescription = Settings_Define.Descriptor{ description = L["CONTRIBUTORS_LANJIAN625_DESCRIPTION"] },
                             widgetTransparent = true
                         }
                     }

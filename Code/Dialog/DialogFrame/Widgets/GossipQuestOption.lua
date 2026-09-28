@@ -39,6 +39,19 @@ do -- Option
                         :size(CONTENT_ICON_SIZE, CONTENT_ICON_SIZE)
                         :background(UIKit.UI.TEXTURE_NIL),
 
+                    Text(name .. ".Sublabel")
+                        :id("Sublabel", id)
+                        :frameLevel(2)
+                        :point(UIKit.Enum.Point.Right)
+                        :x(-8)
+                        :size(UIKit.UI.FIT, UIKit.UI.FIT)
+                        :textJustifyH("RIGHT")
+                        :textJustifyV("MIDDLE")
+                        :fontObject(UIFont.ParchmentOptionText)
+                        :textColor(DialogFrame_Preload.TextColorPrimary)
+                        :textVerticalSpacing(1.5)
+                        :alpha(0.5),
+
                     Text(name .. ".Label")
                         :id("Label", id)
                         :frameLevel(2)
@@ -65,6 +78,7 @@ do -- Option
         frame.Icon = UIKit.GetElementById("Icon", id)
         frame.IconTexture = frame.Icon:GetTextureFrame()
         frame.Label = UIKit.GetElementById("Label", id)
+        frame.Sublabel = UIKit.GetElementById("Sublabel", id)
 
         Mixin(frame, GossipOptionBase.OptionMixin)
         frame:OnLoad()
@@ -91,4 +105,3 @@ do -- Group
         return frame
     end)
 end
-

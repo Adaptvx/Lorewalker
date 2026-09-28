@@ -6,6 +6,7 @@ local UIKit = env.modules:Import("packages\\ui-kit")
 local Frame, LayoutGrid, LayoutHorizontal, LayoutVertical, Text, ScrollContainer, LazyScrollContainer, ScrollBar, ScrollContainerEdge, Input, LinearSlider, HitRect, List, SecureButton, ModelScene = unpack(UIKit.UI.Frames)
 local UIAnim = env.modules:Import("packages\\ui-anim")
 local GossipOptionBase = env.modules:Import("@\\Dialog\\DialogFrame\\Widgets\\GossipOptionBase")
+local DialogFrame_Preload = env.modules:Import("@\\Dialog\\DialogFrame\\Preload")
 local StoryMode_Preload = env.modules:Import("@\\Dialog\\Modes\\Story\\Preload")
 local StoryMode_UI = env.modules:New("@\\Dialog\\Modes\\Story\\UI")
 
@@ -176,6 +177,7 @@ do -- Option
     local ICON_SIZE = 22
     local TEXT_MAX_WIDTH = 300
     local CONTENT_SPACING = 12
+    local SUBLABEL_WIDTH = UIKit.Define.Fit{ delta = CONTENT_SPACING }
     local ALPHA_DISABLED = 0.5
     local ALPHA_NORMAL = 0.75
     local ALPHA_HIGHLIGHTED = 1
@@ -255,7 +257,19 @@ do -- Option
                         :textColor(GenericEnum.UIColorRGB.WHITE_FONT_COLOR)
                         :textJustifyH("LEFT")
                         :textJustifyV("MIDDLE")
-                        :wordWrap(true)
+                        :wordWrap(true),
+
+                    Text(name .. ".Sublabel")
+                        :id("Sublabel", id)
+                        :frameLevel(2)
+                        :point(UIKit.Enum.Point.Right)
+                        :size(SUBLABEL_WIDTH, UIKit.UI.FIT)
+                        :textJustifyH("RIGHT")
+                        :textJustifyV("MIDDLE")
+                        :fontObject(UIFont.UIFontObjectNormal16)
+                        :textColor(GenericEnum.UIColorRGB.WHITE_FONT_COLOR)
+                        :textVerticalSpacing(1.5)
+                        :alpha(0.5)
                 })
                     :id("ContainerFrame", id)
                     :frameLevel(2)
@@ -272,6 +286,7 @@ do -- Option
         frame.Icon = UIKit.GetElementById("Icon", id)
         frame.IconTexture = frame.Icon:GetTextureFrame()
         frame.Label = UIKit.GetElementById("Label", id)
+        frame.Sublabel = UIKit.GetElementById("Sublabel", id)
 
         Mixin(frame, OptionMixin)
         frame:OnLoad()

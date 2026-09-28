@@ -479,10 +479,16 @@ do -- Dialog Frame
                 Frame(name .. ".ContentFrame", {
                     Frame(name .. ".Shadow")
                         :id("Shadow", id)
-                        :frameLevel(1)
+                        :frameLevel(0)
                         :background(DialogFrame_Preload.UIDEF.UIDialogFrameShadow)
                         :size(UIKit.Define.Fill{ delta = -125 })
                         :alpha(0.5),
+
+                    Frame(name .. ".ContentFrame.Underlay")
+                        :id("ContentFrame.Underlay", id)
+                        :frameLevel(1)
+                        :background(DialogFrame_Preload.FrameBackgroundTexture)
+                        :size(UIKit.Define.Fill{ delta = -12 }),
 
                     Frame(name .. ".ContentFrame.Background")
                         :id("ContentFrame.Background", id)
@@ -574,6 +580,8 @@ do -- Dialog Frame
     frame.TitleContainer.SettingButton = UIKit.GetElementById("TitleContainer.SettingButton", id)
     frame.TitleContainer.CloseButton = UIKit.GetElementById("TitleContainer.CloseButton", id)
     frame.ContentFrame = UIKit.GetElementById("ContentFrame", id)
+    frame.ContentFrame.Underlay = UIKit.GetElementById("ContentFrame.Underlay", id)
+    frame.ContentFrame.UnderlayTexture = frame.ContentFrame.Underlay:GetTextureFrame()
     frame.ContentFrame.Background = UIKit.GetElementById("ContentFrame.Background", id)
     frame.ContentFrame.BackgroundTexture = frame.ContentFrame.Background:GetTextureFrame()
     frame.DialogGlyph = UIKit.GetElementById("DialogGlyph", id)

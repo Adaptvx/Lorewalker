@@ -1,9 +1,7 @@
 local env = select(2, ...)
 local Config = env.Config
-local Enum = env.Enum
 local CallbackRegistry = env.modules:Import("packages\\callback-registry")
-local WoWClient = env.modules:Import("packages\\wow-client")
-local InputUtil = env.modules:Import("@\\InputUtil")
+local InputHandler = env.modules:Import("packages\\input-handler")
 local ControlCenter = env.modules:Import("@\\Dialog\\ControlCenter")
 local DialogFrame = env.modules:Import("@\\Dialog\\DialogFrame")
 local Modes_ModeHandler = env.modules:Import("@\\Dialog\\Modes\\ModeHandler")
@@ -12,13 +10,13 @@ local ControlDispatcher = env.modules:New("@\\ControlDispatcher")
 
 local REPEAT_INITIAL_DELAY = 0.375
 local REPEAT_INTERVAL = 0.125
-local driverFrame = CreateFrame("Frame")
+local Repeater = InputHandler.NewRepeater(REPEAT_INITIAL_DELAY, REPEAT_INTERVAL)
 
 
 local function TryClick(button)
     if button and button:IsShown() and button:IsVisible() then
         button:OnClick()
-        WoWClient.BlockKeyEvent()
+        InputHandler.BlockKeyEvent()
         return true
     end
 end
@@ -26,7 +24,7 @@ end
 local function TryScrollDown(container)
     if container and container:IsVisible() and container:HasContentBelow() then
         container:ScrollDown()
-        WoWClient.BlockKeyEvent()
+        InputHandler.BlockKeyEvent()
         return true
     end
 end
@@ -34,14 +32,14 @@ end
 local function TryScrollUp(container)
     if container and container:IsVisible() and container:HasContentAbove() then
         container:ScrollUp()
-        WoWClient.BlockKeyEvent()
+        InputHandler.BlockKeyEvent()
         return true
     end
 end
 
 local function HandleSelectionResult(selected, deselected, allowScroll, scrollFunc, scrollContainer)
     if selected then
-        WoWClient.BlockKeyEvent()
+        InputHandler.BlockKeyEvent()
         return true
     end
 
@@ -50,7 +48,7 @@ local function HandleSelectionResult(selected, deselected, allowScroll, scrollFu
             return true
         end
 
-        WoWClient.BlockKeyEvent()
+        InputHandler.BlockKeyEvent()
         return false
     end
 end
@@ -63,7 +61,7 @@ local function HandleStoryOptionsAction(handler)
     if not IsStoryOptionsShown() then return end
 
     if handler(LWStoryOptionsBox) then
-        WoWClient.BlockKeyEvent()
+        InputHandler.BlockKeyEvent()
         return true
     end
     return false
@@ -74,7 +72,7 @@ local function HandleConfirmAction()
     if result ~= nil then return result end
 
     if LWDialogFrame:ConfirmGossipSelection() or LWDialogFrame:ConfirmQuestSelection() then
-        WoWClient.BlockKeyEvent()
+        InputHandler.BlockKeyEvent()
         return true
     end
 
@@ -84,7 +82,7 @@ end
 local function HandleCloseAction()
     if Config.DBGlobal:GetVariable("CloseToPreviousPage") == false then
         DialogFrame.RequestCloseSession()
-        WoWClient.BlockKeyEvent()
+        InputHandler.BlockKeyEvent()
         return true
     end
 
@@ -149,75 +147,75 @@ local function HandleSelectDialogOptionAction(optionIndex)
 end
 
 local DIALOG_FRAME_ACTIONS = {
-    [InputUtil.Enum.Actions.Confirm] = {
+    [env.Enum.Actions.Confirm] = {
         handler = HandleConfirmAction,
     },
-    [InputUtil.Enum.Actions.Close] = {
+    [env.Enum.Actions.Close] = {
         handler = HandleCloseAction,
     },
-    [InputUtil.Enum.Actions.ScrollDown] = {
+    [env.Enum.Actions.ScrollDown] = {
         handler = HandleScrollDownAction,
         repeatable = true,
     },
-    [InputUtil.Enum.Actions.ScrollUp] = {
+    [env.Enum.Actions.ScrollUp] = {
         handler = HandleScrollUpAction,
         repeatable = true,
     },
-    [InputUtil.Enum.Actions.SelectOption1] = {
+    [env.Enum.Actions.SelectOption1] = {
         handler = function() return HandleSelectDialogOptionAction(1) end,
         block = true,
     },
-    [InputUtil.Enum.Actions.SelectOption2] = {
+    [env.Enum.Actions.SelectOption2] = {
         handler = function() return HandleSelectDialogOptionAction(2) end,
         block = true,
     },
-    [InputUtil.Enum.Actions.SelectOption3] = {
+    [env.Enum.Actions.SelectOption3] = {
         handler = function() return HandleSelectDialogOptionAction(3) end,
         block = true,
     },
-    [InputUtil.Enum.Actions.SelectOption4] = {
+    [env.Enum.Actions.SelectOption4] = {
         handler = function() return HandleSelectDialogOptionAction(4) end,
         block = true,
     },
-    [InputUtil.Enum.Actions.SelectOption5] = {
+    [env.Enum.Actions.SelectOption5] = {
         handler = function() return HandleSelectDialogOptionAction(5) end,
         block = true,
     },
-    [InputUtil.Enum.Actions.SelectOption6] = {
+    [env.Enum.Actions.SelectOption6] = {
         handler = function() return HandleSelectDialogOptionAction(6) end,
         block = true,
     },
-    [InputUtil.Enum.Actions.SelectOption7] = {
+    [env.Enum.Actions.SelectOption7] = {
         handler = function() return HandleSelectDialogOptionAction(7) end,
         block = true,
     },
-    [InputUtil.Enum.Actions.SelectOption8] = {
+    [env.Enum.Actions.SelectOption8] = {
         handler = function() return HandleSelectDialogOptionAction(8) end,
         block = true,
     },
-    [InputUtil.Enum.Actions.SelectOption9] = {
+    [env.Enum.Actions.SelectOption9] = {
         handler = function() return HandleSelectDialogOptionAction(9) end,
         block = true,
     },
 }
 
 local IMMERSIVE_ACTIONS = {
-    [InputUtil.Enum.Actions.PreviousDialog]  = {
+    [env.Enum.Actions.PreviousDialog]  = {
         handler = LWImmersiveChatBubble.PreviousDialog,
         block = true,
     },
-    [InputUtil.Enum.Actions.NextDialog]  = {
+    [env.Enum.Actions.NextDialog]  = {
         handler = LWImmersiveChatBubble.NextDialog,
         block = true,
     },
 }
 
 local STORY_ACTIONS = {
-    [InputUtil.Enum.Actions.Confirm] = {
+    [env.Enum.Actions.Confirm] = {
         handler = LWStoryDialogBox.NextDialog,
         block = true,
     },
-    [InputUtil.Enum.Actions.Close] = {
+    [env.Enum.Actions.Close] = {
         handler = function()
             if not ControlCenter.IsInSession() then return false end
             DialogFrame.RequestCloseSession()
@@ -225,18 +223,18 @@ local STORY_ACTIONS = {
         end,
         block = true,
     },
-    [InputUtil.Enum.Actions.NextDialog]  = {
+    [env.Enum.Actions.NextDialog]  = {
         handler = LWStoryDialogBox.NextDialog,
         block = true,
     },
 }
 
 local function IsImmersiveModeActive()
-    return Modes_ModeHandler.IsModeActive(Enum.Mode.Immersive)
+    return Modes_ModeHandler.IsModeActive(env.Enum.Mode.Immersive)
 end
 
 local function IsStoryModeActive()
-    return Modes_ModeHandler.IsModeActive(Enum.Mode.Story)
+    return Modes_ModeHandler.IsModeActive(env.Enum.Mode.Story)
 end
 
 local function IsDialogFrameShown()
@@ -244,34 +242,26 @@ local function IsDialogFrameShown()
 end
 
 local function CanProcessKeyInput()
-    return IsImmersiveModeActive() or IsStoryModeActive() or IsDialogFrameShown()
+    return not LWSettingFrame:IsShown() and (IsImmersiveModeActive() or IsStoryModeActive() or IsDialogFrameShown())
 end
 
-local function GetActionForKey(key, actions)
-    for action, actionData in pairs(actions) do
-        if key == InputUtil.GetKeybind(action) then
-            return actionData
-        end
-    end
-end
-
-local function HandleActionForKey(key)
+local function HandleAction(actionID)
     if IsStoryModeActive() then
-        local action = GetActionForKey(key, STORY_ACTIONS)
+        local action = STORY_ACTIONS[actionID]
         if action and action.handler(LWStoryDialogBox) then
             return action, IsStoryModeActive
         end
     end
 
     if IsImmersiveModeActive() then
-        local action = GetActionForKey(key, IMMERSIVE_ACTIONS)
+        local action = IMMERSIVE_ACTIONS[actionID]
         if action and action.handler(LWImmersiveChatBubble) then
             return action, IsImmersiveModeActive
         end
     end
 
     if IsStoryOptionsShown() then
-        local action = GetActionForKey(key, DIALOG_FRAME_ACTIONS)
+        local action = DIALOG_FRAME_ACTIONS[actionID]
         if action and action.handler() then
             return action, IsStoryOptionsShown
         end
@@ -279,51 +269,13 @@ local function HandleActionForKey(key)
     end
 
     if IsDialogFrameShown() then
-        local action = GetActionForKey(key, DIALOG_FRAME_ACTIONS)
+        local action = DIALOG_FRAME_ACTIONS[actionID]
         if action and action.handler() then
             return action, IsDialogFrameShown
         end
     end
 end
 
-
-function ControlDispatcher.RepeatAction_OnUpdate(_, elapsed)
-    if not ControlDispatcher.repeatAction or not ControlDispatcher.repeatActionIsActive() then
-        ControlDispatcher.StopRepeatingAction()
-        return
-    end
-
-    ControlDispatcher.repeatElapsed = ControlDispatcher.repeatElapsed + elapsed
-    if ControlDispatcher.repeatElapsed < REPEAT_INTERVAL then
-        return
-    end
-
-    ControlDispatcher.repeatElapsed = 0
-
-    if not ControlDispatcher.repeatAction.handler() then
-        ControlDispatcher.StopRepeatingAction()
-    end
-end
-
-function ControlDispatcher.StartRepeatingAction(key, action, isActionActive)
-    ControlDispatcher.repeatKey = key
-    ControlDispatcher.repeatAction = action
-    ControlDispatcher.repeatActionIsActive = isActionActive
-    ControlDispatcher.repeatElapsed = -REPEAT_INITIAL_DELAY
-    driverFrame:SetScript("OnUpdate", ControlDispatcher.RepeatAction_OnUpdate)
-end
-
-function ControlDispatcher.StopRepeatingAction()
-    if not ControlDispatcher.repeatAction then
-        return
-    end
-
-    driverFrame:SetScript("OnUpdate", nil)
-    ControlDispatcher.repeatKey = nil
-    ControlDispatcher.repeatAction = nil
-    ControlDispatcher.repeatActionIsActive = nil
-    ControlDispatcher.repeatElapsed = nil
-end
 
 function ControlDispatcher.ReleasePushedDialogOption()
     local optionElement = ControlDispatcher.pushedDialogOption
@@ -335,22 +287,33 @@ function ControlDispatcher.ReleasePushedDialogOption()
     optionElement:UpdateButtonState()
 end
 
-function ControlDispatcher.OnKeyDown(key)
+function ControlDispatcher.OnKeyDown(key, device)
     if not CanProcessKeyInput() then
-        ControlDispatcher.StopRepeatingAction()
+        Repeater:Stop()
         ControlDispatcher.ReleasePushedDialogOption()
         return
     end
 
-    if key == ControlDispatcher.repeatKey or key == ControlDispatcher.pushedDialogOptionKey then
-        WoWClient.BlockKeyEvent()
+    if Repeater:IsRepeatingKey(key) or key == ControlDispatcher.pushedDialogOptionKey then
+        InputHandler.BlockKeyEvent()
         return
     end
 
-    ControlDispatcher.StopRepeatingAction()
+    Repeater:Stop()
     ControlDispatcher.ReleasePushedDialogOption()
 
-    local action, isActionActive = HandleActionForKey(key)
+    local bindingKey = InputHandler.GetKeyChord(key)
+    if not bindingKey then return end
+    local actionID = InputHandler.Keybindings:GetActionForBinding(bindingKey, device)
+    if Config.DBGlobal:GetVariable("ConfirmUseInteractKey") then
+        if InputHandler.IsKeyBinding(key, "INTERACTTARGET") then
+            actionID = env.Enum.Actions.Confirm
+        elseif actionID == env.Enum.Actions.Confirm then
+            return
+        end
+    end
+    if not actionID then return end
+    local action, isActionActive = HandleAction(actionID)
     if not action then return end
 
     if ControlDispatcher.pushedDialogOption then
@@ -358,17 +321,19 @@ function ControlDispatcher.OnKeyDown(key)
     end
 
     if action.block then
-        WoWClient.BlockKeyEvent()
+        InputHandler.BlockKeyEvent()
     end
 
     if action.repeatable then
-        ControlDispatcher.StartRepeatingAction(key, action, isActionActive)
+        Repeater:Start(key, bindingKey, action.handler, function()
+            return CanProcessKeyInput() and isActionActive()
+        end)
     end
 end
 
 function ControlDispatcher.OnKeyUp(key)
-    if key == ControlDispatcher.repeatKey then
-        ControlDispatcher.StopRepeatingAction()
+    if Repeater:IsRepeatingKey(key) then
+        Repeater:Stop()
     end
 
     if key == ControlDispatcher.pushedDialogOptionKey then
@@ -376,6 +341,8 @@ function ControlDispatcher.OnKeyUp(key)
     end
 end
 
-CallbackRegistry.Add("WoWClient.OnKeyDown", function(_, key) ControlDispatcher.OnKeyDown(key) end)
-CallbackRegistry.Add("WoWClient.OnKeyUp", function(_, key) ControlDispatcher.OnKeyUp(key) end)
-CallbackRegistry.Add("ControlCenter.ModeChanged", ControlDispatcher.StopRepeatingAction)
+CallbackRegistry.Add("InputHandler.OnKeyDown", function(_, key, device)
+    ControlDispatcher.OnKeyDown(key, device)
+end)
+CallbackRegistry.Add("InputHandler.OnKeyUp", function(_, key) ControlDispatcher.OnKeyUp(key) end)
+CallbackRegistry.Add("ControlCenter.ModeChanged", function() Repeater:Stop() end)
