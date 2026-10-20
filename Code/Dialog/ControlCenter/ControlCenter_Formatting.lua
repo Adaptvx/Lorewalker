@@ -5,6 +5,8 @@ local ControlCenter_Formatting = env.modules:New("@\\Dialog\\ControlCenter\\Form
 
 local format, gsub, find = string.format, string.gsub, string.find
 local band = bit.band
+local ipairs = ipairs
+local tinsert = table.insert
 
 local TRIVIAL_QUEST_DISPLAY_UNCOLORED = gsub(gsub(TRIVIAL_QUEST_DISPLAY, "|c%x%x%x%x%x%x%x%x", ""), "|r", "")
 local PLAY_MOVIE_LABEL_PREPEND = Enum.GossipOptionRecFlags and Enum.GossipOptionRecFlags.PlayMovieLabelPrepend
@@ -20,11 +22,26 @@ local COLOR_MAP = {
         ["|cFF00BFF3"]        = "|cFF6EBAD6"
     }
 }
+local textModifiers = {}
 
 local function ApplyColorReplacements(text, colorMap)
     for alertColor, replaceColor in pairs(colorMap) do
         text = gsub(text, alertColor, replaceColor)
     end
+    return text
+end
+
+function ControlCenter_Formatting.AddTextModifier(modifier)
+    tinsert(textModifiers, modifier)
+end
+
+function ControlCenter_Formatting.FormatText(text)
+    if not text then return text end
+
+    for _, modifier in ipairs(textModifiers) do
+        text = modifier(text)
+    end
+
     return text
 end
 

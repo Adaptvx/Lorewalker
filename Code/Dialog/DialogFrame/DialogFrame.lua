@@ -8,6 +8,7 @@ local Sound = env.modules:Import("packages\\sound")
 local UIKit = env.modules:Import("packages\\ui-kit")
 local UIAnim = env.modules:Import("packages\\ui-anim")
 local SharedUtil = env.modules:Import("@\\Dialog\\SharedUtil")
+local TextPlaybackUtil = env.modules:Import("@\\Dialog\\TextPlaybackUtil")
 local Modes_ModeHandler = env.modules:Await("@\\Dialog\\Modes\\ModeHandler")
 local Settings = env.modules:Await("@\\Settings")
 local PlayerMovementFrameFader = env.modules:Import("@\\PlayerMovementFrameFader")
@@ -121,6 +122,10 @@ end
 
 function DialogFrameMixin:OnLoad()
     self.showDefaultText = true
+    self.textPlaybackState = nil
+    self.textPlaybackLabel = nil
+    self.textPlaybackText = nil
+    self.textPlaybackContent = nil
     self.forcedAspectRatio = 1.32
     self.minWidth = 378
     self.minHeight = self.minWidth * self.forcedAspectRatio
@@ -128,6 +133,9 @@ function DialogFrameMixin:OnLoad()
     self.maxHeight = self.maxWidth * self.forcedAspectRatio
 
     SharedUtil.InitializeBoundsForFrame(self, "dialogFrameBounds", self.TitleContainer, 3, self.GetDefaultSize)
+
+    self:HookScript("OnUpdate", self.OnTextPlaybackUpdate)
+    self:HookScript("OnHide", function() self:StopTextPlayback(true) end)
 
     self.TitleContainer.CloseButton:HookClick(function()
         self:CloseSession()
@@ -137,11 +145,7 @@ function DialogFrameMixin:OnLoad()
         self:OpenSettingsMenu()
     end)
 
-    self.HitRect:AddOnMouseUp(function(button)
-        if button == "RightButton" and Config.DBGlobal:GetVariable("RightClickToClose") then
-            self:CloseSession()
-        end
-    end)
+    self.HitRect:AddOnMouseUp(function(button) self:OnMouseUp(button) end)
 
     CallbackRegistry.Add(DialogFrame.Events.OpenRequested, function() self:Open() end)
     CallbackRegistry.Add(DialogFrame.Events.CloseRequested, function() self:Close() end)
@@ -442,7 +446,7 @@ function DialogFrameMixin:Open()
 
     self:Show()
     self.AnimGroup:Play(self, "INSTANT")
-    self.AnimGroup:Play(self, "CONTENT_INTRO")
+    if not self.textPlaybackState then self.AnimGroup:Play(self, "CONTENT_INTRO") end
 
     if not wasShown then
         Sound.PlaySound("UI", SOUNDKIT.IG_QUEST_LIST_OPEN)
@@ -460,6 +464,7 @@ end
 function DialogFrameMixin:Close(suppressSound)
     local wasShown = self:IsShown()
 
+    self:StopTextPlayback(true)
     self:ResetGossipSelection()
     self:ResetQuestSelection()
     self:SetDialogGlyphVisibility(false)
@@ -479,8 +484,110 @@ end
 function DialogFrameMixin:SetDefaultTextShown(shown)
     self.showDefaultText = shown
     if not shown then
+        self:StopTextPlayback(true)
         self.GossipFrame.GossipText:Hide()
         self.QuestFrame.QuestText:Hide()
+    end
+end
+
+function DialogFrameMixin:IsPlaybackEnabled()
+    return TextPlaybackUtil.IsPlaybackEnabled("TextPlayback_Classic")
+end
+
+function DialogFrameMixin:OnMouseUp(button)
+    local playbackState = self.textPlaybackState
+    if button == "LeftButton" and playbackState and not self.isDragging and not self.isResizing then
+        if self.textPlaybackLabel:IsMouseOver() and playbackState.frame.ScrollContainer:GetScrollFrame():IsMouseOver() then
+            self:StopTextPlayback()
+        end
+    elseif button == "RightButton" and Config.DBGlobal:GetVariable("RightClickToClose") then
+        self:CloseSession()
+    end
+end
+
+local function HideTextPlaybackElement(content, element)
+    tinsert(content, { frame = element, alpha = element:GetAlpha() })
+    element:SetAlpha(0)
+end
+
+function DialogFrameMixin:HideTextPlaybackContent(label)
+    local frame = label == self.GossipFrame.GossipText and self.GossipFrame or self.QuestFrame
+    self.textPlaybackContent = {}
+
+    self.AnimGroup:Stop(self.DetailsFrame)
+    self.DetailsFrame:SetAlpha(1)
+
+    for _, element in ipairs(label:GetFrameParent():GetFrameChildren()) do
+        if element ~= label then HideTextPlaybackElement(self.textPlaybackContent, element) end
+    end
+
+    return frame
+end
+
+function DialogFrameMixin:StopTextPlayback(resetText)
+    local playbackState = self.textPlaybackState
+    self.textPlaybackState = nil
+
+    if playbackState then
+        TextPlaybackUtil.StopAlphaGradientPlayback()
+    end
+
+    if self.textPlaybackLabel then
+        self.textPlaybackLabel:ClearAlphaGradient()
+        if playbackState then self.textPlaybackLabel:SetAlpha(playbackState.alpha) end
+    end
+
+    if resetText then
+        self.TextPlaybackAnimGroup:Stop()
+        if self.textPlaybackContent then
+            for _, element in ipairs(self.textPlaybackContent) do
+                element.frame:SetAlpha(element.alpha)
+            end
+        end
+        self.textPlaybackContent = nil
+        self.textPlaybackLabel = nil
+        self.textPlaybackText = nil
+    elseif playbackState then
+        self.TextPlaybackAnimGroup:Play(self, "SHOW")
+    end
+end
+
+function DialogFrameMixin:OnTextPlaybackUpdate(elapsed)
+    local playbackState = self.textPlaybackState
+    if not playbackState then return end
+
+    if not self:IsPlaybackEnabled() or not self.showDefaultText then
+        self:StopTextPlayback()
+        return
+    end
+
+    if TextPlaybackUtil.UpdateAlphaGradient(playbackState, self.textPlaybackLabel, elapsed) then
+        self:StopTextPlayback()
+    end
+end
+
+function DialogFrameMixin:SetTextWithPlayback(label, text)
+    local playbackEnabled = self:IsPlaybackEnabled()
+    if self.textPlaybackLabel == label and self.textPlaybackText == text then
+        if not playbackEnabled then self:StopTextPlayback() end
+        return
+    end
+
+    self:StopTextPlayback(true)
+    self.textPlaybackLabel = label
+    self.textPlaybackText = text
+
+    local alpha = label:GetAlpha()
+    if playbackEnabled then label:SetAlpha(0) end
+    label:SetText(text)
+
+    if playbackEnabled then
+        local playbackSpeed = Config.DBGlobal:GetVariable("TextPlayback_Speed")
+        self.textPlaybackState = TextPlaybackUtil.CreateAlphaGradientState(text, playbackSpeed, function()
+            label:SetAlpha(alpha)
+        end)
+        self.textPlaybackState.alpha = alpha
+        self.textPlaybackState.frame = self:HideTextPlaybackContent(label)
     end
 end
 
@@ -527,7 +634,9 @@ do --Gossip
 
         self.GossipFrame.GossipText:SetShown(self.showDefaultText and isValidGossipText)
         if self.showDefaultText and isValidGossipText then
-            self.GossipFrame.GossipText:SetText(gossipText)
+            self:SetTextWithPlayback(self.GossipFrame.GossipText, gossipText)
+        else
+            self:StopTextPlayback(true)
         end
     end
 
@@ -797,11 +906,13 @@ do --Quest
 
     function DialogFrameMixin:UpdateQuestText()
         local questText = ControlCenter.GetQuestText()
-        local isValidQuestText = #questText >= 2
+        local isValidQuestText = questText and #questText >= 2
 
         self.QuestFrame.QuestText:SetShown(self.showDefaultText and isValidQuestText)
         if self.showDefaultText and isValidQuestText then
-            self.QuestFrame.QuestText:SetText(questText)
+            self:SetTextWithPlayback(self.QuestFrame.QuestText, questText)
+        else
+            self:StopTextPlayback(true)
         end
     end
 
@@ -1226,6 +1337,16 @@ do
     local FadeInDetails = UIAnim.Animate():property(UIAnim.Enum.Property.Alpha):duration(0.25):from(0):to(1)
     DialogFrameMixin.AnimGroup:Animation("CONTENT_INTRO", function(frame)
         FadeInDetails:Play(frame.DetailsFrame)
+    end)
+end
+
+DialogFrameMixin.TextPlaybackAnimGroup = UIAnim.New()
+do
+    local FadeInContent = UIAnim.Animate():property(UIAnim.Enum.Property.Alpha):duration(0.5):from(0)
+    DialogFrameMixin.TextPlaybackAnimGroup:State("SHOW", function(frame)
+        for _, element in ipairs(frame.textPlaybackContent) do
+            FadeInContent:to(element.alpha):Play(element.frame)
+        end
     end)
 end
 

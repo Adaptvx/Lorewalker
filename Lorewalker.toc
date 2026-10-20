@@ -1,5 +1,5 @@
-## Interface: 120100, 120105
-## Version: 0.0.6 (Beta 6)
+## Interface: 120105
+## Version: 0.0.8 (Beta 8)
 ## Title: Lorewalker
 ## Notes: A modern questing experience.
 ## Author: AdaptiveX
@@ -20,9 +20,11 @@ Code\Tooltip.lua
 Code\StaticPopup.lua
 Code\HideUI.lua
 Code\CameraEffects.lua
+Code\UI\UI.xml
 
 Code\Dialog\Dialog.xml
 Code\Settings\Settings.xml
 Code\ControlDispatcher.lua
+Code\SupportedAddons\SupportedAddons.xml
 
 API.lua

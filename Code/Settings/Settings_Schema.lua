@@ -64,12 +64,12 @@ local Settings_Preload = env.modules:Import("@\\Settings\\Preload")
 local Settings_Schema = env.modules:New("@\\Settings\\Schema")
 
 Settings_Schema.BINDING_BUTTON_OPTIONS = {
-    manager = InputHandler.Keybindings,
+    manager            = InputHandler.Keybindings,
     textFormattingFunc = SharedUtil.GetHotkeyText,
-    getDevice = function()
+    getDevice          = function()
         return Config.DBGlobal:GetVariable("BindingDevice")
     end,
-    isAllowed = function(key, device)
+    isAllowed          = function(key, device)
         return device == Config.DBGlobal:GetVariable("BindingDevice") and not key:find("BUTTON%d+") and not key:find("MOUSEWHEEL")
     end
 }
@@ -124,7 +124,8 @@ do -- Schema
     local function FormatPercentage(value) return string.format("%0.0f", value * 100) .. "%" end
     local function FormatSeconds(value) return string.format(L["FORMAT_SECONDS"], value) end
     local function IsKeyboardBindingDevice() return Config.DBGlobal:GetVariable("BindingDevice") == InputHandler.Enum.InputDevices.KBM end
-    local function IsImmersivePlaybackDisabled() return not Config.DBGlobal:GetVariable("Immersive_Playback") end
+    local function IsTextPlaybackDisabled() return not Config.DBGlobal:GetVariable("TextPlayback") end
+    local function IsImmersivePlaybackDisabled() return IsTextPlaybackDisabled() or not Config.DBGlobal:GetVariable("TextPlayback_Immersive") end
 
     Settings_Schema.SCHEMA = {
         {
@@ -197,6 +198,92 @@ do -- Schema
                             widgetName = L["CONFIG_DIALOGUE_PREFERENCES_SHOWQUESTLEVEL"],
                             widgetType = Settings_Enum.WidgetType.CheckButton,
                             key        = "ShowQuestLevel"
+                        },
+                        {
+                            widgetName = L["CONFIG_DIALOGUE_PREFERENCES_SHOWQUESTPREVIEWTOOLTIP"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "ShowQuestPreviewTooltip"
+                        }
+                    }
+                },
+                {
+                    widgetName = L["CONFIG_DIALOGUE_TEXTPLAYBACK"],
+                    widgetType = Settings_Enum.WidgetType.Container,
+                    children   = {
+                        {
+                            widgetName        = L["CONFIG_DIALOGUE_TEXTPLAYBACK_USE"],
+                            widgetDescription = Settings_Define.Descriptor{ description = L["CONFIG_DIALOGUE_TEXTPLAYBACK_USE_DESCRIPTION"] },
+                            widgetType        = Settings_Enum.WidgetType.CheckButton,
+                            key               = "TextPlayback"
+                        },
+                        {
+                            widgetName  = L["CONFIG_DIALOGUE_TEXTPLAYBACK_CLASSIC"],
+                            widgetType  = Settings_Enum.WidgetType.CheckButton,
+                            key         = "TextPlayback_Classic",
+                            indent      = 1,
+                            disableWhen = IsTextPlaybackDisabled
+                        },
+                        {
+                            widgetName  = L["CONFIG_DIALOGUE_TEXTPLAYBACK_IMMERSIVE"],
+                            widgetType  = Settings_Enum.WidgetType.CheckButton,
+                            key         = "TextPlayback_Immersive",
+                            indent      = 1,
+                            disableWhen = IsTextPlaybackDisabled
+                        },
+                        {
+                            widgetName                     = L["CONFIG_DIALOGUE_TEXTPLAYBACK_SPEED"],
+                            widgetType                     = Settings_Enum.WidgetType.Range,
+                            widgetRange_min                = 0.5,
+                            widgetRange_max                = 2,
+                            widgetRange_step               = 0.1,
+                            widgetRange_textFormattingFunc = FormatPercentage,
+                            key                            = "TextPlayback_Speed",
+                            indent                         = 1,
+                            disableWhen                    = IsTextPlaybackDisabled
+                        },
+                        {
+                            widgetName  = L["CONFIG_DIALOGUE_TEXTPLAYBACK_AUTOPROGRESS"],
+                            widgetType  = Settings_Enum.WidgetType.CheckButton,
+                            key         = "TextPlayback_AutoProgress",
+                            indent      = 1,
+                            disableWhen = IsImmersivePlaybackDisabled
+                        },
+                        {
+                            widgetName                     = L["CONFIG_DIALOGUE_TEXTPLAYBACK_AUTOPROGRESSDELAY"],
+                            widgetType                     = Settings_Enum.WidgetType.Range,
+                            widgetRange_min                = 0,
+                            widgetRange_max                = 5,
+                            widgetRange_step               = 0.5,
+                            widgetRange_textFormattingFunc = FormatSeconds,
+                            key                            = "TextPlayback_AutoProgressDelay",
+                            indent                         = 2,
+                            disableWhen                    = function() return IsImmersivePlaybackDisabled() or not Config.DBGlobal:GetVariable("TextPlayback_AutoProgress") end
+                        },
+                        {
+                            widgetName  = L["CONFIG_DIALOGUE_TEXTPLAYBACK_PUNCTUATIONPAUSING"],
+                            widgetType  = Settings_Enum.WidgetType.CheckButton,
+                            key         = "TextPlayback_PunctuationPausing",
+                            indent      = 1,
+                            disableWhen = IsTextPlaybackDisabled
+                        },
+                        {
+                            widgetName        = L["CONFIG_DIALOGUE_TEXTPLAYBACK_AUTOCLOSE"],
+                            widgetDescription = Settings_Define.Descriptor{ description = L["CONFIG_DIALOGUE_TEXTPLAYBACK_AUTOCLOSE_DESCRIPTION"] },
+                            widgetType        = Settings_Enum.WidgetType.CheckButton,
+                            key               = "TextPlayback_AutoClose",
+                            indent            = 1,
+                            disableWhen       = IsImmersivePlaybackDisabled
+                        },
+                        {
+                            widgetName                     = L["CONFIG_DIALOGUE_TEXTPLAYBACK_CONTENTPREVIEWALPHA"],
+                            widgetType                     = Settings_Enum.WidgetType.Range,
+                            widgetRange_min                = 0,
+                            widgetRange_max                = 1,
+                            widgetRange_step               = 0.05,
+                            widgetRange_textFormattingFunc = FormatPercentage,
+                            key                            = "TextPlayback_ContentPreviewAlpha",
+                            indent                         = 1,
+                            disableWhen                    = IsImmersivePlaybackDisabled
                         }
                     }
                 },
@@ -227,67 +314,6 @@ do -- Schema
                             widgetDescription = Settings_Define.Descriptor{ description = L["CONFIG_DIALOGUE_IMMERSIVE_SPLITPARAGRAPHS_DESCRIPTION"] },
                             widgetType        = Settings_Enum.WidgetType.CheckButton,
                             key               = "Immersive_SplitParagraphs"
-                        },
-                        {
-                            widgetName        = L["CONFIG_DIALOGUE_IMMERSIVE_PLAYBACK"],
-                            widgetDescription = Settings_Define.Descriptor{ description = L["CONFIG_DIALOGUE_IMMERSIVE_PLAYBACK_DESCRIPTION"] },
-                            widgetType        = Settings_Enum.WidgetType.CheckButton,
-                            key               = "Immersive_Playback"
-                        },
-                        {
-                            widgetName                     = L["CONFIG_DIALOGUE_IMMERSIVE_PLAYBACKSPEED"],
-                            widgetType                     = Settings_Enum.WidgetType.Range,
-                            widgetRange_min                = 0.5,
-                            widgetRange_max                = 2,
-                            widgetRange_step               = 0.1,
-                            widgetRange_textFormattingFunc = FormatPercentage,
-                            key                            = "Immersive_PlaybackSpeed",
-                            indent                         = 1,
-                            disableWhen                    = IsImmersivePlaybackDisabled
-                        },
-                        {
-                            widgetName  = L["CONFIG_DIALOGUE_IMMERSIVE_PLAYBACKAUTOPROGRESS"],
-                            widgetType  = Settings_Enum.WidgetType.CheckButton,
-                            key         = "Immersive_PlaybackAutoProgress",
-                            indent      = 1,
-                            disableWhen = IsImmersivePlaybackDisabled
-                        },
-                        {
-                            widgetName                     = L["CONFIG_DIALOGUE_IMMERSIVE_PLAYBACKAUTOPROGRESSDELAY"],
-                            widgetType                     = Settings_Enum.WidgetType.Range,
-                            widgetRange_min                = 0,
-                            widgetRange_max                = 5,
-                            widgetRange_step               = 0.5,
-                            widgetRange_textFormattingFunc = FormatSeconds,
-                            key                            = "Immersive_PlaybackAutoProgressDelay",
-                            indent                         = 2,
-                            disableWhen                    = function() return IsImmersivePlaybackDisabled() or not Config.DBGlobal:GetVariable("Immersive_PlaybackAutoProgress") end
-                        },
-                        {
-                            widgetName  = L["CONFIG_DIALOGUE_IMMERSIVE_PLAYBACKPUNCTUATIONPAUSING"],
-                            widgetType  = Settings_Enum.WidgetType.CheckButton,
-                            key         = "Immersive_PlaybackPunctuationPausing",
-                            indent      = 1,
-                            disableWhen = IsImmersivePlaybackDisabled
-                        },
-                        {
-                            widgetName        = L["CONFIG_DIALOGUE_IMMERSIVE_PLAYBACKAUTOCLOSE"],
-                            widgetDescription = Settings_Define.Descriptor{ description = L["CONFIG_DIALOGUE_IMMERSIVE_PLAYBACKAUTOCLOSE_DESCRIPTION"] },
-                            widgetType        = Settings_Enum.WidgetType.CheckButton,
-                            key               = "Immersive_PlaybackAutoClose",
-                            indent            = 1,
-                            disableWhen       = IsImmersivePlaybackDisabled
-                        },
-                        {
-                            widgetName                     = L["CONFIG_DIALOGUE_IMMERSIVE_CONTENTPREVIEWALPHA"],
-                            widgetType                     = Settings_Enum.WidgetType.Range,
-                            widgetRange_min                = 0,
-                            widgetRange_max                = 1,
-                            widgetRange_step               = 0.05,
-                            widgetRange_textFormattingFunc = FormatPercentage,
-                            key                            = "Immersive_ContentPreviewAlpha",
-                            indent                         = 1,
-                            disableWhen                    = IsImmersivePlaybackDisabled
                         }
                     }
                 }
@@ -556,6 +582,12 @@ do -- Schema
                             widgetName        = L["CONTRIBUTORS_CRAZYYOUNGS"],
                             widgetType        = Settings_Enum.WidgetType.Text,
                             widgetDescription = Settings_Define.Descriptor{ description = L["CONTRIBUTORS_CRAZYYOUNGS_DESCRIPTION"] },
+                            widgetTransparent = true
+                        },
+                        {
+                            widgetName        = L["CONTRIBUTORS_BRAINC3LL"],
+                            widgetType        = Settings_Enum.WidgetType.Text,
+                            widgetDescription = Settings_Define.Descriptor{ description = L["CONTRIBUTORS_BRAINC3LL_DESCRIPTION"] },
                             widgetTransparent = true
                         },
                         {

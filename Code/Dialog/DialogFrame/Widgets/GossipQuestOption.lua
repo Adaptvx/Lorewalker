@@ -11,13 +11,17 @@ local Mixin = Mixin
 do -- Option
     local OPTION_PADDING = 8
     local OPTION_ICON_SIZE = 20
+    local CONTENT_TEXT_GAP = 8
     local BACKGROUND_SIZE = UIKit.Define.Fill{ delta = -6 }
     local WIDTH = UIKit.Define.Percentage{ value = 100 }
     local HEIGHT = UIKit.Define.Fit{ delta = OPTION_PADDING }
     local CONTENT_WIDTH = UIKit.Define.Percentage{ value = 100, operator = "-", delta = OPTION_PADDING }
     local CONTENT_ICON_SIZE = OPTION_ICON_SIZE
-    local CONTENT_TEXT_WIDTH = UIKit.Define.Percentage{ value = 100, operator = "-", delta = OPTION_ICON_SIZE + OPTION_PADDING }
-    local CONTENT_TEXT_X = OPTION_ICON_SIZE + 8
+    local CONTENT_TEXT_X = OPTION_ICON_SIZE + CONTENT_TEXT_GAP
+    local CONTENT_TEXT_WIDTH = UIKit.Define.Percentage{ value = 100, operator = "-", delta = function(frame)
+        local sublabel = UIKit.GetElementById("Sublabel", frame.templateID)
+        return CONTENT_TEXT_X + (sublabel:IsShown() and sublabel:GetWidth() + CONTENT_TEXT_GAP * 2 or 0)
+    end }
 
     GossipQuestOption.Option = UIKit.Template(function(id, name, children, ...)
         local frame =
@@ -43,7 +47,7 @@ do -- Option
                         :id("Sublabel", id)
                         :frameLevel(2)
                         :point(UIKit.Enum.Point.Right)
-                        :x(-8)
+                        :x(-CONTENT_TEXT_GAP)
                         :size(UIKit.UI.FIT, UIKit.UI.FIT)
                         :textJustifyH("RIGHT")
                         :textJustifyV("MIDDLE")
@@ -79,6 +83,7 @@ do -- Option
         frame.IconTexture = frame.Icon:GetTextureFrame()
         frame.Label = UIKit.GetElementById("Label", id)
         frame.Sublabel = UIKit.GetElementById("Sublabel", id)
+        frame.Label.templateID = id
 
         Mixin(frame, GossipOptionBase.OptionMixin)
         frame:OnLoad()

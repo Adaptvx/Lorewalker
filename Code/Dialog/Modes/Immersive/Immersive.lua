@@ -498,7 +498,7 @@ function ChatBubbleMixin:SetNameplate(unit)
 end
 
 function ChatBubbleMixin:IsPlaybackEnabled()
-    return TextPlaybackUtil.IsPlaybackEnabled()
+    return TextPlaybackUtil.IsPlaybackEnabled("TextPlayback_Immersive")
 end
 
 function ChatBubbleMixin:CancelAutoProgress()
@@ -529,7 +529,7 @@ function ChatBubbleMixin:ScheduleAutoProgress()
 
     self.autoProgressTimer = C_Timer.NewTimer(delay, function()
         self.autoProgressTimer = nil
-        if not self:IsPlaybackEnabled() then return end
+        if not self:IsPlaybackEnabled() or not TextPlaybackUtil.IsAutoProgressEnabled() then return end
         if not ImmersiveMode.isActive or not self:IsShown() or self.isFinished then return end
         if self.sourceText ~= sourceText or self.messageIndex ~= messageIndex then return end
 
@@ -553,6 +553,12 @@ function ChatBubbleMixin:OnTextPlaybackUpdate(elapsed)
     local playbackState = self.textPlaybackState
     if not playbackState then return end
 
+    if not self:IsPlaybackEnabled() then
+        self:CancelAutoProgress()
+        self:StopTextPlayback(true)
+        return
+    end
+
     local currentText, remainingText, isFinished = TextPlaybackUtil.Update(playbackState, elapsed)
     if not currentText then return end
 
@@ -570,7 +576,7 @@ function ChatBubbleMixin:StartTextPlayback(text, shouldAutoProgress)
     self:CancelAutoProgress()
     self:StopTextPlayback()
 
-    local playbackSpeed = Config.DBGlobal:GetVariable("Immersive_PlaybackSpeed")
+    local playbackSpeed = Config.DBGlobal:GetVariable("TextPlayback_Speed")
     self.textPlaybackState = TextPlaybackUtil.CreateState(text, playbackSpeed)
     self.textPlaybackState.shouldAutoProgress = shouldAutoProgress == true
 
@@ -682,7 +688,7 @@ function ChatBubbleMixin:ShowNextMessage(continueAutoProgress)
         self:CancelAutoProgress()
         self:StopTextPlayback(true)
 
-        local autoClose = Config.DBGlobal:GetVariable("Immersive_PlaybackAutoClose")
+        local autoClose = Config.DBGlobal:GetVariable("TextPlayback_AutoClose")
         if self:IsPlaybackEnabled() and autoClose and ControlCenter.GetGossipSessionType() and not ControlCenter.HasGossipOptions() then
             CloseSession()
         else

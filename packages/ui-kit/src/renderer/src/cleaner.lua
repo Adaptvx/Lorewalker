@@ -110,15 +110,16 @@ local function ProcessBackwardPass(frame, actions)
 end
 
 function UIKit_Renderer_Cleaner.Wash()
+    waitingForWash = false
     if dirtyCount == 0 then return end
     if UIKit_Renderer_Cleaner.onCooldown then
+        waitingForWash = true
         washTimer:Start(0)
         return
     end
 
     UIKit_Renderer_Cleaner.onCooldown = true
     cooldownTimer:Start(0)
-    waitingForWash = false
 
     local deferProtected = InCombatLockdown()
     local requiresDependencyPass = UIKit_Renderer_Cleaner.requiresDependencyPass

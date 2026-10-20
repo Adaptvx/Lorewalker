@@ -1,0 +1,5 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Script file="Preload.lua" />
+    <Script file="ExperienceBar\ExperienceBar_UI.lua" />
+    <Script file="ExperienceBar\ExperienceBar.lua" />
+</Ui>

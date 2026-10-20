@@ -68,6 +68,12 @@ local function HandleStoryOptionsAction(handler)
 end
 
 local function HandleConfirmAction()
+    if LWDialogFrame.textPlaybackState then
+        LWDialogFrame:StopTextPlayback()
+        InputHandler.BlockKeyEvent()
+        return true
+    end
+
     local result = HandleStoryOptionsAction(LWStoryOptionsBox.ConfirmSelection)
     if result ~= nil then return result end
 

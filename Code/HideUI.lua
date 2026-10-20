@@ -42,7 +42,9 @@ end
 
 
 HideUI.Enabled = false
+HideUI.FadeDuration = 0.2
 HideUI.fadeOutPlayback = false
+HideUI.isHidden = false
 
 
 function HideUI.LoadOptions()
@@ -55,12 +57,12 @@ SavedVariables.OnChange("LorewalkerDB_Global", "HideUI", HideUI.LoadOptions)
 
 HideUI.AnimGroup = UIAnim.New()
 do
-    local FadeIn = UIAnim.Animate():property(UIAnim.Enum.Property.Alpha):duration(0.2):from(0):to(1)
+    local FadeIn = UIAnim.Animate():property(UIAnim.Enum.Property.Alpha):duration(HideUI.FadeDuration):from(0):to(1)
     HideUI.AnimGroup:State("FADE_IN", function(frame)
         FadeIn:Play(frame)
     end)
 
-    local FadeOut = UIAnim.Animate():property(UIAnim.Enum.Property.Alpha):duration(0.2):to(0)
+    local FadeOut = UIAnim.Animate():property(UIAnim.Enum.Property.Alpha):duration(HideUI.FadeDuration):to(0)
     HideUI.AnimGroup:State("FADE_OUT", function(frame)
         FadeOut:Play(frame)
     end)
@@ -86,6 +88,9 @@ local function ShowUIParent(applyAlpha)
     else
         UIParent:Show()
     end
+
+    HideUI.isHidden = false
+    CallbackRegistry.Trigger("HideUI.VisibilityChanged", false)
 end
 
 local function OnUIParentHidden()
@@ -100,6 +105,9 @@ function HideUI.FadeOut(instant)
     HideUI.AnimGroup:Stop(UIParent)
 
     Tooltip.Modify()
+
+    HideUI.isHidden = true
+    CallbackRegistry.Trigger("HideUI.VisibilityChanged", true)
 
     if instant then
         HideUIParent()

@@ -79,6 +79,26 @@ local GetQuestRewardCurrenciesByQuestID = C_QuestInfoSystem.GetQuestRewardCurren
 local GetQuestRewardSpellInfo = C_QuestInfoSystem.GetQuestRewardSpellInfo
 local GetNumQuestLogRewardCurrencies = GetNumQuestLogRewardCurrencies or Zero
 local GetQuestLogRewardCurrencyInfo = GetQuestLogRewardCurrencyInfo or Nil
+local GetQuestLogRewardCurrencyInfoByQuestID = C_QuestLog.GetQuestRewardCurrencyInfo or Nil
+local GetNumQuestLogRewards = GetNumQuestLogRewards
+local GetNumQuestLogChoices = GetNumQuestLogChoices
+local GetQuestLogRewardInfo = GetQuestLogRewardInfo
+local GetQuestLogChoiceInfo = GetQuestLogChoiceInfo
+local GetQuestLogRewardXP = GetQuestLogRewardXP
+local GetQuestLogRewardMoney = GetQuestLogRewardMoney
+local GetQuestLogRewardHonor = GetQuestLogRewardHonor or Zero
+local GetQuestLogRewardTitle = GetQuestLogRewardTitle or Nil
+local GetQuestLogRewardSkillPoints = GetQuestLogRewardSkillPoints or Nil
+local GetQuestLogQuestText = GetQuestLogQuestText
+local GetQuestLogSelection = GetQuestLogSelection
+local GetSelectedQuest = C_QuestLog.GetSelectedQuest
+local GetQuestPartyProgress = (C_TooltipInfo and C_TooltipInfo.GetQuestPartyProgress) or Nil
+local GetQuestLogMajorFactionReputationRewards = C_QuestLog.GetQuestLogMajorFactionReputationRewards or Nil
+local RequestLoadQuestByID = C_QuestLog.RequestLoadQuestByID
+local RequestLoadItemDataByID = C_Item.RequestLoadItemDataByID
+local RequestPreloadRewardData = C_TaskQuest.RequestPreloadRewardData
+local HaveQuestData = HaveQuestData
+local HaveQuestRewardData = HaveQuestRewardData
 local GetQuestItemInfoLootType = GetQuestItemInfoLootType or Zero
 local GetQuestOfferRewardCurrencyInfo = (C_QuestOffer and C_QuestOffer.GetQuestRewardCurrencyInfo) or Nil
 local GetQuestRequiredCurrencyInfo = (C_QuestOffer and C_QuestOffer.GetQuestRequiredCurrencyInfo) or Nil
@@ -104,6 +124,9 @@ local IsActiveQuestLegendary = IsActiveQuestLegendary or False
 local IsCurrentQuestFailed = IsCurrentQuestFailed or False
 local UnitClass = UnitClass
 local UnitExists = UnitExists
+local UnitXPMax = UnitXPMax
+local UnitFactionGroup = UnitFactionGroup
+local IsInGroup = IsInGroup
 local ipairs = ipairs
 local pairs = pairs
 local wipe = table.wipe
@@ -167,9 +190,18 @@ local Pools = {
     quest    = Pool.New(function() return ControlCenter_Preload.SessionInfo.QuestInfo{} end, WipeStruct),
     result   = Pool.New(function() return {} end, function(_, object) wipe(object) end)
 }
+local PreviewPools = {
+    item     = Pool.New(function() return ControlCenter_Preload.QuestRewardInfo.ItemInfo{} end, WipeStruct),
+    spell    = Pool.New(function() return ControlCenter_Preload.QuestRewardInfo.SpellInfo{} end, WipeStruct),
+    currency = Pool.New(function() return ControlCenter_Preload.QuestRewardInfo.CurrencyInfo{} end, WipeStruct),
+    result   = Pool.New(function() return {} end, function(_, object) wipe(object) end)
+}
 
 function ControlCenter_DataProvider.ReleaseAllPools()
     for _, pool in pairs(Pools) do
+        pool:ReleaseAll()
+    end
+    for _, pool in pairs(PreviewPools) do
         pool:ReleaseAll()
     end
 end
@@ -323,28 +355,75 @@ do --Helpers
 end
 
 do --Fetchers
-    local function CreateItemInfo(questRewardType, index)
-        local name, texture, count, quality, isUsable, itemID, flags = GetQuestItemInfo(questRewardType, index)
-        local itemInfo = Pools.item:Acquire()
+    local function GetPreviewSpellType(spellData)
+        if spellData.type and spellData.type ~= Enum.QuestCompleteSpellType.LegacyBehavior then
+            return spellData.type
+        elseif spellData.isTradeskill then
+            return Enum.QuestCompleteSpellType.Tradeskill
+        elseif spellData.isBoostSpell then
+            return Enum.QuestCompleteSpellType.Ability
+        elseif spellData.garrFollowerID then
+            local followerInfo = C_Garrison.GetFollowerInfo(spellData.garrFollowerID)
+            if followerInfo and followerInfo.followerTypeID == Enum.GarrisonFollowerType.FollowerType_9_0_GarrisonFollower then
+                return Enum.QuestCompleteSpellType.Companion
+            end
+            return Enum.QuestCompleteSpellType.Follower
+        elseif spellData.isSpellLearned then
+            return Enum.QuestCompleteSpellType.Spell
+        elseif spellData.genericUnlock then
+            return Enum.QuestCompleteSpellType.Unlock
+        end
+        return Enum.QuestCompleteSpellType.Aura
+    end
+
+    local function ShouldShowPreviewSpell(spellID, spellData)
+        local isKnown = nil
+        if WoWClient.IS_RETAIL then
+            isKnown = C_SpellBook.IsSpellInSpellBook(spellID, Enum.SpellBookSpellBank.Player, true)
+        else
+            isKnown = IsSpellKnown(spellID)
+        end
+
+        return spellData.texture and not isKnown and (not spellData.isBoostSpell or IsCharacterNewlyBoosted()) and (not spellData.garrFollowerID or not C_Garrison.IsFollowerCollected(spellData.garrFollowerID))
+    end
+
+    local function CreateItemInfo(questRewardType, index, questID)
+        local name, texture, count, quality, isUsable, itemID, flags = nil, nil, nil, nil, nil, nil, nil
+        local lootType = ControlCenter_Preload.Enum.LootType.Item
+
+        if questID then
+            local getInfo = questRewardType == "choice" and GetQuestLogChoiceInfo or GetQuestLogRewardInfo
+            name, texture, count, quality, isUsable, itemID, _, flags = getInfo(index, questID)
+            if not name and itemID and itemID > 0 then
+                RequestLoadItemDataByID(itemID)
+            end
+        else
+            name, texture, count, quality, isUsable, itemID, flags = GetQuestItemInfo(questRewardType, index)
+            lootType = GetQuestItemInfoLootType(questRewardType, index)
+        end
+
+        local pools = questID and PreviewPools or Pools
+        local itemInfo = pools.item:Acquire()
         itemInfo.rewardID = itemID
         itemInfo.name = name
         itemInfo.texture = texture
         itemInfo.count = count
         itemInfo.quality = quality
         itemInfo.isUsable = isUsable
-        itemInfo.lootType = GetQuestItemInfoLootType(questRewardType, index)
+        itemInfo.lootType = lootType
         itemInfo.questRewardContextFlags = flags
         itemInfo.questRewardType = questRewardType
         itemInfo.questRewardIndex = index
         return itemInfo
     end
 
-    local function CreateCurrencyInfo(questRewardType, index, currencyData, poolType)
+    local function CreateCurrencyInfo(questRewardType, index, currencyData, poolType, isPreview)
         if not currencyData then
             return nil
         end
 
-        local currencyInfo = Pools.currency:Acquire()
+        local pools = isPreview and PreviewPools or Pools
+        local currencyInfo = pools.currency:Acquire()
         currencyInfo.rewardID = currencyData.currencyID
         currencyInfo.name = currencyData.name
         currencyInfo.texture = currencyData.texture
@@ -362,39 +441,46 @@ do --Fetchers
         return currencyInfo
     end
 
-    function ControlCenter_DataProvider.FetchItemInfo(questRewardType, num)
-        local result = Pools.result:Acquire()
+    function ControlCenter_DataProvider.FetchItemInfo(questRewardType, num, questID)
+        local pools = questID and PreviewPools or Pools
+        local result = pools.result:Acquire()
 
         for index = 1, num or 0 do
-            result[index] = CreateItemInfo(questRewardType, index)
+            result[index] = CreateItemInfo(questRewardType, index, questID)
         end
 
         return result
     end
 
-    function ControlCenter_DataProvider.FetchChoiceInfo(num)
-        local result = Pools.result:Acquire()
+    function ControlCenter_DataProvider.FetchChoiceInfo(num, questID)
+        local pools = questID and PreviewPools or Pools
+        local result = pools.result:Acquire()
 
         for index = 1, num or 0 do
-            local lootType = GetQuestItemInfoLootType("choice", index)
-            if WoWClient.IS_RETAIL and lootType == ControlCenter_Preload.Enum.LootType.Currency then
-                --mirrors Blizzard QuestInfo_ShowRewards, where choice rewards can be currencies
-                result[index] = CreateCurrencyInfo("choice", index, GetQuestOfferRewardCurrencyInfo("choice", index), "Currency") or CreateItemInfo("choice", index)
-            else
-                result[index] = CreateItemInfo("choice", index)
+            local currencyData = nil
+            if questID then
+                currencyData = WoWClient.IS_RETAIL and GetQuestLogRewardCurrencyInfoByQuestID(questID, index, true)
+            elseif WoWClient.IS_RETAIL and GetQuestItemInfoLootType("choice", index) == ControlCenter_Preload.Enum.LootType.Currency then
+                currencyData = GetQuestOfferRewardCurrencyInfo("choice", index)
             end
+            result[index] = currencyData and CreateCurrencyInfo("choice", index, currencyData, "Currency", questID ~= nil) or CreateItemInfo("choice", index, questID)
         end
 
         return result
     end
 
-    function ControlCenter_DataProvider.FetchSpells(questRewardType, questID, spellIDList)
-        local result = Pools.result:Acquire()
+    function ControlCenter_DataProvider.FetchSpells(questRewardType, questID, spellIDList, isPreview)
+        local pools = isPreview and PreviewPools or Pools
+        local result = pools.result:Acquire()
 
         for index, spellID in ipairs(spellIDList or EMPTY_TABLE) do
-            local spellData = GetQuestRewardSpellInfo(questID, spellID)
-            if spellData then
-                local spellInfo = Pools.spell:Acquire()
+            local spellData = nil
+            if not isPreview or (spellID and spellID > 0) then
+                spellData = GetQuestRewardSpellInfo(questID, spellID)
+            end
+
+            if spellData and (not isPreview or ShouldShowPreviewSpell(spellID, spellData)) then
+                local spellInfo = pools.spell:Acquire()
                 spellInfo.rewardID = spellID
                 spellInfo.name = spellData.name
                 spellInfo.texture = spellData.texture
@@ -404,7 +490,7 @@ do --Fetchers
                 spellInfo.hideSpellLearnText = spellData.hideSpellLearnText
                 spellInfo.isBoostSpell = spellData.isBoostSpell
                 spellInfo.genericUnlock = spellData.genericUnlock
-                spellInfo.spellType = spellData.type
+                spellInfo.spellType = isPreview and GetPreviewSpellType(spellData) or spellData.type
                 spellInfo.questRewardType = questRewardType
                 spellInfo.questRewardIndex = index
                 result[#result + 1] = spellInfo
@@ -414,13 +500,14 @@ do --Fetchers
         return result
     end
 
-    function ControlCenter_DataProvider.FetchCurrencies(questID)
-        local result = Pools.result:Acquire()
+    function ControlCenter_DataProvider.FetchCurrencies(questID, isPreview)
+        local pools = isPreview and PreviewPools or Pools
+        local result = pools.result:Acquire()
 
         if WoWClient.IS_CLASSIC_ALL then
             for index = 1, GetNumQuestLogRewardCurrencies(questID) do
                 local name, texture, amount, currencyID, quality = GetQuestLogRewardCurrencyInfo(index, questID)
-                local currencyInfo = Pools.currency:Acquire()
+                local currencyInfo = pools.currency:Acquire()
                 currencyInfo.rewardID = currencyID
                 currencyInfo.name = name
                 currencyInfo.texture = texture
@@ -434,7 +521,7 @@ do --Fetchers
             end
         elseif WoWClient.IS_RETAIL then
             for index, currencyData in ipairs(GetQuestRewardCurrenciesByQuestID(questID) or EMPTY_TABLE) do
-                result[#result + 1] = CreateCurrencyInfo("reward", index, currencyData)
+                result[#result + 1] = CreateCurrencyInfo("reward", index, currencyData, nil, isPreview)
             end
         end
 
@@ -472,7 +559,7 @@ do --Fetchers
         local result = Pools.result:Acquire()
 
         for _, gossipOption in ipairs(gossipOptions or EMPTY_TABLE) do
-            local optionName = gossipOption.name or ""
+            local optionName = ControlCenter_Formatting.FormatText(gossipOption.name or "")
             local optionInfo = Pools.option:Acquire()
             optionInfo.name = ControlCenter_Formatting.FormatOption(optionName, gossipOption.flags)
             optionInfo.alternateName = ControlCenter_Formatting.FormatOption(optionName, gossipOption.flags, true)
@@ -531,9 +618,96 @@ end
 
 do --Quest Info
     local QuestInfoBuffer = ControlCenter_Preload.SessionInfo.QuestInfo{}
+    local QuestPreviewInfoBuffer = ControlCenter_Preload.SessionInfo.QuestInfo{}
+    local QuestPreviewSkillInfoBuffer = ControlCenter_Preload.QuestRewardInfo.SkillInfo{}
     local SkillInfoBuffer = ControlCenter_Preload.QuestRewardInfo.SkillInfo{}
     local SpellObjectiveInfoBuffer = ControlCenter_Preload.QuestRewardInfo.SpellInfo{}
     local QuestLoreSources = { GetGreetingText, GetQuestText, GetProgressText, GetRewardText }
+
+    function ControlCenter_DataProvider.RequestQuestPreviewData(questID)
+        if not questID or questID <= 0 then return end
+
+        if RequestLoadQuestByID and not HaveQuestData(questID) then RequestLoadQuestByID(questID) end
+        if not HaveQuestRewardData(questID) then RequestPreloadRewardData(questID) end
+    end
+
+    function ControlCenter_DataProvider.BuildQuestPreviewInfo(questInfo)
+        for _, pool in pairs(PreviewPools) do
+            pool:ReleaseAll()
+        end
+
+        Struct.Wipe(QuestPreviewInfoBuffer)
+        Struct.Wipe(QuestPreviewSkillInfoBuffer)
+
+        local result = QuestPreviewInfoBuffer
+        local questID = questInfo.questID
+        result.questID = questID
+        result.questName = questInfo.questName
+        result.questObjectives = questInfo.questObjectives
+        if not questID or questID <= 0 then return result, true end
+
+        result.questObjectives = GetQuestObjectivesByQuestID(questID) or result.questObjectives
+        local questLogIndex = GetQuestLogIndexByQuestID(questID)
+        if questLogIndex and questLogIndex > 0 then
+            local _, objectives = GetQuestLogQuestText(questLogIndex)
+            result.questObjectiveText = objectives or ""
+        end
+        if WoWClient.IS_RETAIL then
+            result.questLegend = {
+                classificationText = QuestUtil.GetQuestClassificationString(questID),
+                questTypeText = QuestUtils_GetQuestTypeIconMarkupString(questID),
+                accountText = QuestUtil.GetAccountQuestText(questID),
+                isQuestline = GetQuestClassificationByQuestID(questID) == Enum.QuestClassification.Questline
+            }
+        end
+        if IsInGroup() then
+            result.questPartyProgress = GetQuestPartyProgress(questID)
+        end
+
+        local isDataReady = HaveQuestData(questID) and HaveQuestRewardData(questID)
+        if not isDataReady or not C_QuestLog.ShouldShowQuestRewards(questID) then return result, isDataReady end
+
+        result.questRewardExperience = GetQuestLogRewardXP(questID) or 0
+        local maxXP = UnitXPMax("player")
+        if result.questRewardExperience > 0 and maxXP and maxXP > 0 then
+            result.questRewardExperiencePercentage = (result.questRewardExperience / maxXP) * 100
+        end
+        result.questRewardMoney = GetQuestLogRewardMoney(questID) or 0
+        result.questRewardHonor = GetQuestLogRewardHonor(questID) or 0
+        result.questRewardHonorTexture = UnitFactionGroup("player") == PLAYER_FACTION_GROUP[0] and "Interface\\Icons\\PVPCurrency-Honor-Horde" or "Interface\\Icons\\PVPCurrency-Honor-Alliance"
+
+        local selectedQuestID = nil
+        if GetSelectedQuest then
+            selectedQuestID = GetSelectedQuest()
+        elseif GetQuestLogSelection then
+            local selectedIndex = GetQuestLogSelection()
+            if selectedIndex and selectedIndex > 0 then
+                selectedQuestID = select(8, GetQuestLogTitleByIndex(selectedIndex))
+            end
+        end
+        if selectedQuestID == questID then
+            result.questRewardTitle = GetQuestLogRewardTitle()
+            QuestPreviewSkillInfoBuffer.name, QuestPreviewSkillInfoBuffer.texture, QuestPreviewSkillInfoBuffer.points = GetQuestLogRewardSkillPoints()
+            result.questRewardSkill = QuestPreviewSkillInfoBuffer
+        end
+
+        result.questRewardNumReceive = GetNumQuestLogRewards(questID) or 0
+        result.questRewardNumChoice = GetNumQuestLogChoices(questID, true) or 0
+        result.questRewardReceive = ControlCenter_DataProvider.FetchItemInfo("reward", result.questRewardNumReceive, questID)
+        result.questRewardChoices = ControlCenter_DataProvider.FetchChoiceInfo(result.questRewardNumChoice, questID)
+        result.questRewardCurrencies = ControlCenter_DataProvider.FetchCurrencies(questID, true)
+        result.questRewardNumCurrencies = #result.questRewardCurrencies
+
+        result.questRewardSpells = ControlCenter_DataProvider.FetchSpells("reward", questID, GetQuestRewardSpellIDs(questID), true)
+        result.questRewardNumSpell = #result.questRewardSpells
+
+        local reputation = GetQuestLogMajorFactionReputationRewards(questID)
+        for _, rewardInfo in ipairs(reputation or EMPTY_TABLE) do
+            rewardInfo.factionInfo = C_MajorFactions.GetMajorFactionData(rewardInfo.factionID)
+        end
+        result.questRewardMajorFactionReputationReward = reputation
+        return result, true
+    end
 
     local function GetQuestLore()
         for _, func in ipairs(QuestLoreSources) do
@@ -573,7 +747,7 @@ do --Quest Info
         SkillInfoBuffer.points = questSkillPoints
 
         Struct.Wipe(QuestInfoBuffer)
-        QuestInfoBuffer.questLore = GetQuestLore()
+        QuestInfoBuffer.questLore = ControlCenter_Formatting.FormatText(GetQuestLore())
         QuestInfoBuffer.questName = GetTitleText() or ""
         QuestInfoBuffer.questType = ControlCenter_DataProvider.GetQuestType(questID, questTagInfo)
         QuestInfoBuffer.questTagID = questTagInfo and questTagInfo.tagID
@@ -588,7 +762,7 @@ do --Quest Info
         QuestInfoBuffer.questIsPartySync = HasQuestSessionBonus(questID)
         QuestInfoBuffer.questIsFailed = GetQuestFailedState(questID) or IsCurrentQuestFailed()
         QuestInfoBuffer.questObjectives = GetQuestObjectivesByQuestID(questID)
-        QuestInfoBuffer.questObjectiveText = GetObjectiveText()
+        QuestInfoBuffer.questObjectiveText = ControlCenter_Formatting.FormatText(GetObjectiveText())
         QuestInfoBuffer.questSpellObjective = objectiveSpellID and SpellObjectiveInfoBuffer
         QuestInfoBuffer.questTimeLeft = GetQuestTimeLeftSeconds(questID)
         QuestInfoBuffer.questResetTime = GetQuestResetTime()
@@ -676,7 +850,7 @@ do --Gossip Info
         AppendResults(sortedQuests, gossipCompleteQuests)
         AppendResults(sortedQuests, gossipIncompleteQuests)
 
-        gossipInfoTemplate.gossipLore = gossipLore
+        gossipInfoTemplate.gossipLore = ControlCenter_Formatting.FormatText(gossipLore)
         gossipInfoTemplate.gossipOptions = gossipOptions
         gossipInfoTemplate.gossipQuests = sortedQuests
         gossipInfoTemplate.gossipAvailableQuests = gossipAvailableQuests

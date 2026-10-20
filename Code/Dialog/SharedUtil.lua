@@ -1,6 +1,7 @@
 local env = select(2, ...)
 local Config = env.Config
 local Path = env.modules:Import("packages\\path")
+local GenericEnum = env.modules:Import("packages\\generic-enum")
 local InputHandler = env.modules:Import("packages\\input-handler")
 local LazyTimer = env.modules:Import("packages\\lazy-timer")
 local WoWClient = env.modules:Import("packages\\wow-client")
@@ -10,8 +11,13 @@ local UIParent = UIParent
 local GetCursorPosition = GetCursorPosition
 local ResetCursor = ResetCursor
 local SetCursor = SetCursor
+local AbbreviateNumbers = AbbreviateNumbers
+local BreakUpLargeNumbers = BreakUpLargeNumbers
+local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
+local ipairs = ipairs
 local next = next
 local type = type
+local format = string.format
 local gsub = string.gsub
 local abs = math.abs
 local floor = math.floor
@@ -188,6 +194,22 @@ local HOTKEY_REPLACEMENT_MAP_BY_DEVICE = {
     }
 }
 local SNAP_THRESHOLD = 12
+local EMPTY_TABLE = {}
+local OBJECTIVE_PREFIX = GenericEnum.ColorHEX.QUEST_OBJECTIVE_DISABLED_FONT_COLOR .. "- |r"
+local QUEST_LEGEND_SEPARATOR = "    "
+local SPELL_REWARD_HEADERS = {
+    { spellType = Enum.QuestCompleteSpellType.Follower,            text = REWARD_FOLLOWER },
+    { spellType = Enum.QuestCompleteSpellType.Companion,           text = REWARD_COMPANION },
+    { spellType = Enum.QuestCompleteSpellType.Tradeskill,          text = REWARD_TRADESKILL_SPELL },
+    { spellType = Enum.QuestCompleteSpellType.Ability,             text = REWARD_ABILITY },
+    { spellType = Enum.QuestCompleteSpellType.Aura,                text = REWARD_AURA },
+    { spellType = Enum.QuestCompleteSpellType.Spell,               text = REWARD_SPELL },
+    { spellType = Enum.QuestCompleteSpellType.Unlock,              text = REWARD_UNLOCK },
+    { spellType = Enum.QuestCompleteSpellType.QuestlineUnlock,     text = REWARD_QUESTLINE_UNLOCK },
+    { spellType = Enum.QuestCompleteSpellType.QuestlineReward,     text = REWARD_QUESTLINE_REWARD },
+    { spellType = Enum.QuestCompleteSpellType.QuestlineUnlockPart, text = REWARD_QUESTLINE_UNLOCK_PART },
+    { spellType = Enum.QuestCompleteSpellType.PossibleReward,      text = REWARD_POSSIBLE_QUEST_REWARD }
+}
 
 local function GetDefaultSize(frame)
     if not frame.boundsDefaultSize then return end
@@ -298,6 +320,88 @@ end
 local function StopDrag(frame)
     frame.isBoundsDragging = false
     if not frame.isNameplateAnchored then SharedUtil.SaveBounds(frame) end
+end
+
+local function AddColoredLine(text, color)
+    GameTooltip:AddLine(text, color.r, color.g, color.b, true)
+end
+
+local function AddQuestHeader(text)
+    GameTooltip:AddLine(" ")
+    AddColoredLine(text, GenericEnum.ColorRGB01.NORMAL_FONT_COLOR)
+end
+
+local function FormatRewardLine(texture, name, count)
+    local iconText = texture and format("|T%s:16:16:0:0:64:64|t ", texture) or ""
+    local countText = count and count > 1 and count .. " " or ""
+    return iconText .. countText .. (name or "")
+end
+
+local function AddQuestRewardLine(rewardInfo, useContainer)
+    local name = rewardInfo.name
+    local texture = rewardInfo.texture
+    local count = rewardInfo.count or rewardInfo.totalRewardAmount
+    local quality = rewardInfo.quality
+    local containerInfo = useContainer and rewardInfo.containerInfo
+
+    if containerInfo then
+        name = containerInfo.name
+        texture = containerInfo.icon
+        count = containerInfo.displayAmount or count
+        quality = containerInfo.quality
+    end
+
+    local color = ITEM_QUALITY_COLORS[quality or 1].color
+    GameTooltip:AddLine(FormatRewardLine(texture, name or RETRIEVING_ITEM_INFO, count), color.r, color.g, color.b)
+end
+
+local function AddQuestLegend(legendInfo)
+    if not legendInfo then return end
+
+    local classificationText = legendInfo.classificationText
+    if classificationText and legendInfo.isQuestline then
+        AddColoredLine(classificationText, GenericEnum.ColorRGB01.NORMAL_FONT_COLOR)
+        classificationText = nil
+    end
+
+    local legendText = classificationText
+    if legendInfo.questTypeText then
+        legendText = legendText and legendText .. QUEST_LEGEND_SEPARATOR .. legendInfo.questTypeText or legendInfo.questTypeText
+    end
+    if legendText then AddColoredLine(legendText, GenericEnum.ColorRGB01.NORMAL_FONT_COLOR) end
+    if legendInfo.accountText then AddColoredLine(legendInfo.accountText, GenericEnum.ColorRGB01.NORMAL_FONT_COLOR) end
+end
+
+local function AddQuestSpellRewards(spells)
+    for _, headerInfo in ipairs(SPELL_REWARD_HEADERS) do
+        local isFirstReward = true
+        for _, spellInfo in ipairs(spells or EMPTY_TABLE) do
+            if spellInfo.spellType == headerInfo.spellType then
+                if isFirstReward and headerInfo.text and not spellInfo.hideSpellLearnText then
+                    AddQuestHeader(headerInfo.text)
+                end
+                isFirstReward = false
+                AddColoredLine(FormatRewardLine(spellInfo.texture, spellInfo.name), GenericEnum.ColorRGB01.WHITE_FONT_COLOR)
+            end
+        end
+    end
+
+    return spells and #spells > 0
+end
+
+local function AddQuestPartyProgress(progressInfo)
+    if not progressInfo or not progressInfo.lines or #progressInfo.lines == 0 then return end
+
+    GameTooltip:AddLine(" ")
+    if PARTY_QUEST_STATUS_ON then GameTooltip:AddLine(PARTY_QUEST_STATUS_ON) end
+    for _, line in ipairs(progressInfo.lines) do
+        if line.type == Enum.TooltipDataLineType.QuestPlayer then
+            local color = line.leftColor or GenericEnum.ColorRGB01.WHITE_FONT_COLOR
+            GameTooltip:AddLine(line.leftText, color.r, color.g, color.b, line.wrapText)
+        elseif line.type == Enum.TooltipDataLineType.QuestObjective then
+            GameTooltip:AddLine(OBJECTIVE_PREFIX .. line.leftText, GenericEnum.ColorRGB01.WHITE_FONT_COLOR.r, GenericEnum.ColorRGB01.WHITE_FONT_COLOR.g, GenericEnum.ColorRGB01.WHITE_FONT_COLOR.b, line.wrapText)
+        end
+    end
 end
 
 
@@ -465,4 +569,87 @@ function SharedUtil.IsForeverQuest(questID)
     end
 
     return true
+end
+
+function SharedUtil.UpdateQuestTooltip(previewInfo, isDataReady, showObjectives)
+    GameTooltip:ClearLines()
+    AddColoredLine(previewInfo.questName, GenericEnum.ColorRGB01.NORMAL_FONT_COLOR)
+    AddQuestLegend(previewInfo.questLegend)
+
+    local objectiveDescription = previewInfo.questObjectiveText
+    local hasDescription = objectiveDescription and objectiveDescription ~= ""
+    local objectives = showObjectives and previewInfo.questObjectives
+    local hasObjectives = objectives and #objectives > 0
+    if hasObjectives or hasDescription then
+        GameTooltip:AddLine(" ")
+        if hasDescription then
+            AddColoredLine(objectiveDescription, GenericEnum.ColorRGB01.WHITE_FONT_COLOR)
+            if hasObjectives then GameTooltip:AddLine(" ") end
+        end
+        for _, objective in ipairs(objectives or EMPTY_TABLE) do
+            AddColoredLine("- " .. objective.text, objective.finished and GenericEnum.ColorRGB01.GRAY_FONT_COLOR or GenericEnum.ColorRGB01.WHITE_FONT_COLOR)
+        end
+    end
+
+    if not isDataReady then
+        GameTooltip:AddLine(" ")
+        AddColoredLine(RETRIEVING_DATA, GenericEnum.ColorRGB01.RED_FONT_COLOR)
+    else
+        local title = previewInfo.questRewardTitle
+        if title then
+            AddQuestHeader(REWARD_TITLE)
+            AddColoredLine(title, GenericEnum.ColorRGB01.WHITE_FONT_COLOR)
+        end
+
+        local hasSpellRewards = AddQuestSpellRewards(previewInfo.questRewardSpells)
+        local numChoices = previewInfo.questRewardNumChoice
+        if numChoices > 0 then
+            AddQuestHeader(numChoices == 1 and REWARD_ITEMS_ONLY or REWARD_CHOICES)
+            for _, rewardInfo in ipairs(previewInfo.questRewardChoices or EMPTY_TABLE) do
+                AddQuestRewardLine(rewardInfo)
+            end
+        end
+
+        local reputationRewards = previewInfo.questRewardMajorFactionReputationReward or EMPTY_TABLE
+        local skillInfo = previewInfo.questRewardSkill
+        local experience = previewInfo.questRewardExperience or 0
+        local money = previewInfo.questRewardMoney or 0
+        local honor = previewInfo.questRewardHonor or 0
+        local hasRewards = previewInfo.questRewardNumReceive > 0 or previewInfo.questRewardNumCurrencies > 0
+            or #reputationRewards > 0 or experience > 0 or money > 0 or honor > 0
+            or (skillInfo and skillInfo.points and skillInfo.points > 0)
+
+        if hasRewards then
+            AddQuestHeader((numChoices > 0 or hasSpellRewards or title) and REWARD_ITEMS or REWARD_ITEMS_ONLY)
+
+            if experience > 0 then
+                local percentage = previewInfo.questRewardExperiencePercentage
+                local percentText = percentage and format(" (%.0f%%)", percentage) or ""
+                AddColoredLine(EXPERIENCE_COLON .. " " .. BreakUpLargeNumbers(experience) .. GenericEnum.ColorHEX.GRAY_FONT_COLOR .. percentText .. "|r", GenericEnum.ColorRGB01.WHITE_FONT_COLOR)
+            end
+            if money > 0 then AddColoredLine(GetCoinTextureString(money), GenericEnum.ColorRGB01.WHITE_FONT_COLOR) end
+            if honor > 0 then AddColoredLine(FormatRewardLine(previewInfo.questRewardHonorTexture, HONOR, honor), GenericEnum.ColorRGB01.WHITE_FONT_COLOR) end
+            if skillInfo and skillInfo.name and skillInfo.points and skillInfo.points > 0 then
+                AddColoredLine(FormatRewardLine(skillInfo.texture, format(BONUS_SKILLPOINTS, skillInfo.name), skillInfo.points), GenericEnum.ColorRGB01.WHITE_FONT_COLOR)
+            end
+
+            for _, rewardInfo in ipairs(previewInfo.questRewardReceive or EMPTY_TABLE) do
+                AddQuestRewardLine(rewardInfo)
+            end
+            for _, rewardInfo in ipairs(previewInfo.questRewardCurrencies or EMPTY_TABLE) do
+                AddQuestRewardLine(rewardInfo, true)
+            end
+            for _, rewardInfo in ipairs(reputationRewards) do
+                local factionInfo = rewardInfo.factionInfo
+                if factionInfo then
+                    local texture = format("Interface\\Icons\\UI_MajorFaction_%s", factionInfo.textureKit)
+                    local text = QUEST_REPUTATION_REWARD_TITLE:format(factionInfo.name) .. " (+" .. AbbreviateNumbers(rewardInfo.rewardAmount) .. ")"
+                    AddColoredLine(FormatRewardLine(texture, text), GenericEnum.ColorRGB01.WHITE_FONT_COLOR)
+                end
+            end
+        end
+    end
+    AddQuestPartyProgress(previewInfo.questPartyProgress)
+
+    GameTooltip:Show()
 end

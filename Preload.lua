@@ -11,8 +11,8 @@ local WoWClient = env.modules:Import("packages\\wow-client")
 env.NAME = "Lorewalker"
 env.ICON = Path.Root .. "\\Art\\Icons\\Logo"
 env.ICON_ALT = Path.Root .. "\\Art\\Icons\\Logo-White"
-env.VERSION_STRING = "Beta 6"
-env.VERSION_NUMBER = 000006
+env.VERSION_STRING = "Beta 8"
+env.VERSION_NUMBER = 000008
 env.DEBUG_MODE = false
 
 
@@ -181,18 +181,22 @@ do
         CameraEffects_FocusInteractTargetPitchStrength     = nil,
         CameraEffects_FocusInteractTargetYawStrength       = nil,
 
+        TextPlayback                                       = false,
+        TextPlayback_Classic                               = true,
+        TextPlayback_Immersive                             = true,
+        TextPlayback_Speed                                 = 1,
+        TextPlayback_AutoProgress                          = true,
+        TextPlayback_AutoProgressDelay                     = 1,
+        TextPlayback_PunctuationPausing                    = true,
+        TextPlayback_AutoClose                             = true,
+        TextPlayback_ContentPreviewAlpha                   = .5,
+
         ForceGossip                                        = false,
         ShowQuestLevel                                     = WoWClient.IS_FOREVER or WoWClient.IS_CLASSIC_ERA,
+        ShowQuestPreviewTooltip                            = true,
         CloseToPreviousPage                                = false,
         RightClickToClose                                  = true,
         Immersive_SplitParagraphs                          = true,
-        Immersive_Playback                                 = false,
-        Immersive_PlaybackSpeed                            = 1,
-        Immersive_PlaybackAutoProgress                     = true,
-        Immersive_PlaybackAutoProgressDelay                = 1,
-        Immersive_PlaybackPunctuationPausing               = true,
-        Immersive_PlaybackAutoClose                        = true,
-        Immersive_ContentPreviewAlpha                      = .5,
         Story_PlaybackSpeed                                = 1,
 
         AudioGlobal                                        = true,

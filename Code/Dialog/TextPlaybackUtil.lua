@@ -106,16 +106,16 @@ function TextPlaybackUtil.IsPauseCharacter(character)
     return false
 end
 
-function TextPlaybackUtil.IsPlaybackEnabled()
-    return Config.DBGlobal:GetVariable("Immersive_Playback")
+function TextPlaybackUtil.IsPlaybackEnabled(key)
+    return Config.DBGlobal:GetVariable("TextPlayback") and Config.DBGlobal:GetVariable(key)
 end
 
 function TextPlaybackUtil.IsAutoProgressEnabled()
-    return Config.DBGlobal:GetVariable("Immersive_PlaybackAutoProgress")
+    return Config.DBGlobal:GetVariable("TextPlayback_AutoProgress")
 end
 
 function TextPlaybackUtil.GetAutoProgressDelay()
-    return max(tonumber(Config.DBGlobal:GetVariable("Immersive_PlaybackAutoProgressDelay")) or 1, 0)
+    return max(tonumber(Config.DBGlobal:GetVariable("TextPlayback_AutoProgressDelay")) or 1, 0)
 end
 
 function TextPlaybackUtil.ShouldSplitParagraphs()
@@ -146,7 +146,7 @@ function TextPlaybackUtil.CreateState(text, playbackSpeed)
         text           = text,
         elapsed        = 0,
         interval       = GetPlaybackInterval(playbackSpeed),
-        pauseEnabled   = Config.DBGlobal:GetVariable("Immersive_PlaybackPunctuationPausing"),
+        pauseEnabled   = Config.DBGlobal:GetVariable("TextPlayback_PunctuationPausing"),
         pauseActive    = false,
         pauseElapsed   = 0,
         lastPauseIndex = nil
@@ -178,7 +178,7 @@ function TextPlaybackUtil.Update(state, elapsed)
 
     local currentText = TextPlaybackUtil.GetSubstring(state.text, 1, characterCount)
     local remainingText = TextPlaybackUtil.GetSubstring(state.text, characterCount + 1, textLength)
-    return currentText, remainingText, characterCount >= textLength
+    return currentText, remainingText, characterCount >= textLength, characterCount
 end
 
 function TextPlaybackUtil.CreateAlphaGradientState(text, playbackSpeed, firstFrameCallback)
@@ -213,7 +213,7 @@ function TextPlaybackUtil.StopAlphaGradientPlayback()
 end
 
 function TextPlaybackUtil.GetPreviewHexColor(fontString)
-    local previewAlpha = Config.DBGlobal:GetVariable("Immersive_ContentPreviewAlpha")
+    local previewAlpha = Config.DBGlobal:GetVariable("TextPlayback_ContentPreviewAlpha")
     if previewAlpha == 0 then return "000000" end
 
     local previewModifier = 0.2 + min(max(tonumber(previewAlpha) or 0.5, 0), 1) / 1.25

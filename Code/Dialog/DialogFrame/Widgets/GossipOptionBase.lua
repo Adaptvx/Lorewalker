@@ -4,7 +4,9 @@ local L = env.L
 local Sound = env.modules:Import("packages\\sound")
 local UICSharedMixin = env.modules:Import("packages\\uic-sharedmixin")
 local InputHandler = env.modules:Import("packages\\input-handler")
+local SharedUtil = env.modules:Import("@\\Dialog\\SharedUtil")
 local ControlCenter_Preload = env.modules:Import("@\\Dialog\\ControlCenter\\Preload")
+local ControlCenter_DataProvider = env.modules:Import("@\\Dialog\\ControlCenter\\DataProvider")
 local ControlCenter = env.modules:Import("@\\Dialog\\ControlCenter")
 local DialogFrame = env.modules:Await("@\\Dialog\\DialogFrame")
 local GossipOptionBase = env.modules:New("@\\Dialog\\DialogFrame\\Widgets\\GossipOptionBase")
@@ -25,10 +27,14 @@ do -- Option
     function OptionMixin:OnLoad()
         self.optionType = nil
         self.optionKey = nil
+        self.questInfo = nil
         self:SetSublabelText(nil)
 
         self:InitButton()
         self:RegisterMouseEvents()
+        self:HookScript("OnEnter", self.Option_OnEnter)
+        self:HookScript("OnLeave", self.Option_OnLeave)
+        self:HookScript("OnHide", self.Option_OnLeave)
         self:HookButtonStateChange(self.UpdateAnimation)
         self:HookEnableChange(self.UpdateAnimation)
         self:HookClick(self.OnClick)
@@ -36,8 +42,39 @@ do -- Option
     end
 
     function OptionMixin:OnClick()
+        self:Option_OnLeave()
         DialogFrame.RequestGossipOptionSelection(self.optionType, self.optionKey)
         self:PlayInteractSound()
+    end
+
+    function OptionMixin:Option_OnEnter()
+        local questInfo = self.questInfo
+        if not questInfo or not self:IsEnabled() or not Config.DBGlobal:GetVariable("ShowQuestPreviewTooltip") then return end
+
+        ControlCenter_DataProvider.RequestQuestPreviewData(questInfo.questID)
+
+        if Config.DBGlobal:GetVariable("ActiveMode") == env.Enum.Mode.Story then
+            GameTooltip_SetDefaultAnchor(GameTooltip, self)
+        else
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        end
+        self:UpdateTooltip()
+    end
+
+    function OptionMixin:Option_OnLeave()
+        if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
+    end
+
+    function OptionMixin:UpdateTooltip()
+        local questInfo = self.questInfo
+        if not questInfo or not self:IsShown() or not GameTooltip:IsOwned(self) then return end
+        if not self:IsEnabled() or not Config.DBGlobal:GetVariable("ShowQuestPreviewTooltip") then
+            self:Option_OnLeave()
+            return
+        end
+
+        local previewInfo, isDataReady = ControlCenter_DataProvider.BuildQuestPreviewInfo(questInfo)
+        SharedUtil.UpdateQuestTooltip(previewInfo, isDataReady, self.optionType == ControlCenter_Preload.Enum.OptionType.QuestIncomplete)
     end
 
     function OptionMixin:SetText(text)
@@ -113,5 +150,10 @@ do -- Group
 
         element.optionType = value.optionType
         element.optionKey = value.optionKey
+        element.questInfo = value.questInfo
+        if GameTooltip:IsShown() and GameTooltip:IsOwned(element) then
+            element:Option_OnLeave()
+            element:Option_OnEnter()
+        end
     end
 end
