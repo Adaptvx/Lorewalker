@@ -1,4 +1,141 @@
+-- ♡ translation by ♡ cathtail ♡ --
 if GetLocale() ~= "ptBR" then return end
 
 local env = select(2, ...)
 local L = env.L
+
+L["ESC"] = "ESC"
+L["GOODBYE"] = GOODBYE
+L["ACCEPT"] = ACCEPT
+L["AUTO_ACCEPT"] = ACCEPT
+L["DECLINE"] = DECLINE
+L["CANCEL"] = CANCEL
+L["CONTINUE"] = CONTINUE
+L["COMPLETE"] = COMPLETE
+L["OBJECTIVES"] = "Objetivos"
+L["REQUIRED_ITEMS"] = TURN_IN_ITEMS
+L["REWARDS"] = "Recompensas"
+L["LEARN_SPELL_OBJECTIVE"] = LEARN_SPELL_OBJECTIVE
+L["WIP"] = "Trabalho em andamento"
+L["FORMAT_SECONDS"] = "%g s"
+
+-- Frames
+L["DIALOG_FRAME"] = "Quadro de Diálogo"
+L["DIALOG_SETTINGS_OPEN"] = "Abrir configurações"
+L["DIALOG_SETTINGS_MODE"] = "Modo de diálogo"
+L["DIALOG_QUEST_LEVEL"] = "Nível %d"
+L["TOOLTIP_EXPERIENCE_BAR_STATISTICS"] = "Estatísticas"
+L["TOOLTIP_EXPERIENCE_BAR_EXPERIENCE_PER_HOUR"] = "%s experiência por hora."
+L["TOOLTIP_EXPERIENCE_BAR_UNTIL_NEXT_LEVEL"] = "%s até o próximo nível."
+L["TOOLTIP_EXPERIENCE_BAR_UNTIL_MAX_LEVEL"] = "%s até o nível máximo."
+
+-- Playback
+L["PLAYBACK_PAUSE_CHARACTERS"] = {
+    "…",
+    "!",
+    "?",
+    ".",
+    ",",
+    ";",
+}
+L["PLAYBACK_SPEED_MODIFIER"] = 1
+
+-- Config
+L["CONFIG_GENERAL"] = "Geral"
+L["CONFIG_GENERAL_PREFERENCES"] = "Preferências"
+L["CONFIG_GENERAL_PREFERENCES_FONT"] = "Fonte"
+L["CONFIG_GENERAL_OTHER"] = "Outro"
+L["CONFIG_GENERAL_OTHER_RESETBUTTON"] = "Redefinir configurações"
+L["CONFIG_GENERAL_OTHER_RESETPROMPT"] = "Você tem certeza que deseja redefinir todas as configurações?"
+L["CONFIG_GENERAL_OTHER_RESETPROMPT_YES"] = "Confirmar"
+L["CONFIG_GENERAL_OTHER_RESETPROMPT_NO"] = "Cancelar"
+
+L["CONFIG_DIALOGUE"] = "Diálogo"
+L["CONFIG_DIALOGUE_MODE_CLASSIC"] = "Clássico"
+L["CONFIG_DIALOGUE_MODE_IMMERSIVE"] = "Imersivo"
+L["CONFIG_DIALOGUE_MODE_STORY"] = "História"
+L["CONFIG_DIALOGUE_PREFERENCES"] = "Preferências"
+L["CONFIG_DIALOGUE_PREFERENCES_FORCEGOSSIP"] = "Exibir diálogo oculto"
+L["CONFIG_DIALOGUE_PREFERENCES_SHOWQUESTLEVEL"] = "Exibir nível da missão"
+L["CONFIG_DIALOGUE_PREFERENCES_SHOWQUESTPREVIEWTOOLTIP"] = "Exibir dica de prévia da missão"
+L["CONFIG_DIALOGUE_TEXTPLAYBACK"] = "Progressão de diálogo"
+L["CONFIG_DIALOGUE_TEXTPLAYBACK_USE"] = "Usar progressão de diálogo"
+L["CONFIG_DIALOGUE_TEXTPLAYBACK_USE_DESCRIPTION"] = "Revela o texto do diálogo gradualmente."
+L["CONFIG_DIALOGUE_TEXTPLAYBACK_CLASSIC"] = "Habilitar no modo clássico"
+L["CONFIG_DIALOGUE_TEXTPLAYBACK_IMMERSIVE"] = "Habilitar no modo imersivo"
+L["CONFIG_DIALOGUE_TEXTPLAYBACK_SPEED"] = "Velocidade da reprodução"
+L["CONFIG_DIALOGUE_TEXTPLAYBACK_AUTOPROGRESS"] = "Progresso automático"
+L["CONFIG_DIALOGUE_TEXTPLAYBACK_AUTOPROGRESSDELAY"] = "Atraso"
+L["CONFIG_DIALOGUE_TEXTPLAYBACK_PUNCTUATIONPAUSING"] = "Pausa em pontuação"
+L["CONFIG_DIALOGUE_TEXTPLAYBACK_AUTOCLOSE"] = "Fechar automaticamente"
+L["CONFIG_DIALOGUE_TEXTPLAYBACK_AUTOCLOSE_DESCRIPTION"] = "Fecha o diálogo após a mensagem final quando não há escolhas disponíveis."
+L["CONFIG_DIALOGUE_TEXTPLAYBACK_CONTENTPREVIEWALPHA"] = "Brilho da prévia de conteúdo"
+L["CONFIG_DIALOGUE_FRAME"] = "Quadro de diálogo"
+L["CONFIG_DIALOGUE_RIGHTCLICKTOCLOSE"] = "Clique direito para fechar"
+L["CONFIG_DIALOGUE_CLOSETOPREVIOUSPAGE"] = "Voltar à página anterior"
+L["CONFIG_DIALOGUE_CLOSETOPREVIOUSPAGE_DESCRIPTION"] = "Em páginas de missões, o atalho de fechar retorna à página anterior em vez de fechar a interface."
+L["CONFIG_DIALOGUE_IMMERSIVE"] = "Imersivo"
+L["CONFIG_DIALOGUE_IMMERSIVE_SPLITPARAGRAPHS"] = "Dividir parágrafos"
+L["CONFIG_DIALOGUE_IMMERSIVE_SPLITPARAGRAPHS_DESCRIPTION"] = "Divide o diálogo em parágrafos. Quando desativado, divide em frases."
+
+L["CONFIG_EFFECTS"] = "Efeitos"
+L["CONFIG_EFFECTS_HIDEUI"] = "Ocultar interface"
+L["CONFIG_EFFECTS_CAMERA"] = "Efeitos da câmera"
+L["CONFIG_EFFECTS_CAMERA_NONE"] = "Nenhum"
+L["CONFIG_EFFECTS_CAMERA_FULL"] = "Completo"
+L["CONFIG_EFFECTS_CAMERA_BALANCED"] = "Equilibrado"
+L["CONFIG_EFFECTS_CAMERA_CUSTOM"] = "Personalizado"
+
+L["CONFIG_TTS"] = "Texto em fala [TTS]"
+
+L["CONFIG_KEYBINDINGS"] = "Teclas de atalho"
+L["CONFIG_KEYBINDINGS_ACTIONS"] = "Ações"
+L["CONFIG_KEYBINDINGS_DEVICE_KBM"] = "Teclado/Mouse"
+L["CONFIG_KEYBINDINGS_DEVICE_GAMEPAD"] = "Controle"
+L["CONFIG_KEYBINDINGS_CONFIRM"] = "Confirmar"
+L["CONFIG_KEYBINDINGS_CONFIRM_USEINTERACTKEY"] = "Usar tecla de interação"
+L["CONFIG_KEYBINDINGS_CLOSE"] = "Fechar"
+L["CONFIG_KEYBINDINGS_SCROLLDOWN"] = "Rolar para baixo"
+L["CONFIG_KEYBINDINGS_SCROLLUP"] = "Rolar para cima"
+L["CONFIG_KEYBINDINGS_SCROLLLEFT"] = "Rolar para a esquerda"
+L["CONFIG_KEYBINDINGS_SCROLLRIGHT"] = "Rolar para a direita"
+L["CONFIG_KEYBINDINGS_PREVIOUSDIALOG"] = "Diálogo anterior"
+L["CONFIG_KEYBINDINGS_NEXTDIALOG"] = "Próximo diálogo"
+L["CONFIG_KEYBINDINGS_SELECTOPTION"] = "Selecionar opção %d"
+
+L["CONFIG_APPEARANCE"] = "Aparência"
+L["CONFIG_APPEARANCE_POSITION"] = "Posição"
+L["CONFIG_APPEARANCE_POSITION_LOCKFRAMEPOSITIONS"] = "Travar posição dos quadros"
+L["CONFIG_APPEARANCE_POSITION_RESTOREPOSITIONS"] = "Restaurar posições"
+L["CONFIG_APPEARANCE_POSITION_RESTOREPOSITIONS_PROMPT"] = "Tem certeza de que deseja redefinir as posições de todos os quadros?"
+L["CONFIG_APPEARANCE_POSITION_RESTOREPOSITIONS_PROMPT_YES"] = "Confirmar"
+L["CONFIG_APPEARANCE_POSITION_RESTOREPOSITIONS_PROMPT_NO"] = "Cancelar"
+L["CONFIG_APPEARANCE_DIALOG"] = "Quadro de diálogo"
+L["CONFIG_APPEARANCE_DIALOG_THEME"] = "Tema"
+L["CONFIG_APPEARANCE_DIALOG_THEME_LIGHT"] = "Claro"
+L["CONFIG_APPEARANCE_DIALOG_THEME_DARK"] = "Escuro"
+L["CONFIG_APPEARANCE_DIALOG_FRAMETHEME"] = "Tema do quadro"
+L["CONFIG_APPEARANCE_DIALOG_FRAMETHEME_DEFAULT"] = "Padrão"
+L["CONFIG_APPEARANCE_DIALOG_FRAMETHEME_FOREVER"] = "Forever"
+L["CONFIG_APPEARANCE_DIALOG_FONTSIZE"] = "Tamanho da fonte"
+L["CONFIG_APPEARANCE_IMMERSIVE"] = "Imersivo"
+L["CONFIG_APPEARANCE_IMMERSIVE_FONTSIZE"] = "Tamanho da fonte dos balões de chat"
+
+L["CONFIG_AUDIO"] = "Áudio"
+L["CONFIG_AUDIO_GENERAL"] = "Geral"
+L["CONFIG_AUDIO_GENERAL_ENABLEGLOBALAUDIO"] = "Habilitar sons"
+
+L["CONFIG_ABOUT"] = "Sobre"
+L["CONFIG_ABOUT_CONTRIBUTORS"] = "Contribuidores"
+L["CONFIG_ABOUT_DEVELOPER"] = "Desenvolvedor"
+L["CONFIG_ABOUT_DEVELOPER_ADAPTIVEX"] = "AdaptiveX"
+
+-- Contributors
+L["CONTRIBUTORS_ZAMESTOTV"] = "ZamestoTV"
+L["CONTRIBUTORS_ZAMESTOTV_DESCRIPTION"] = "Tradutor — Russo"
+L["CONTRIBUTORS_CRAZYYOUNGS"] = "Crazyyoungs"
+L["CONTRIBUTORS_CRAZYYOUNGS_DESCRIPTION"] = "Tradutor — Coreano"
+L["CONTRIBUTORS_BRAINC3LL"] = "Brainc3ll"
+L["CONTRIBUTORS_BRAINC3LL_DESCRIPTION"] = "Tradutor — Francês"
+L["CONTRIBUTORS_LANJIAN625"] = "lanjian625"
+L["CONTRIBUTORS_LANJIAN625_DESCRIPTION"] = "Code — Beta Bug Fix"
