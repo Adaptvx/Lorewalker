@@ -53,14 +53,14 @@ local function HandleSelectionResult(selected, deselected, allowScroll, scrollFu
     end
 end
 
-local function IsStoryOptionsShown()
-    return LWStoryOptionsBox:IsActive()
+local function IsOptionsBoxShown()
+    return LWOptionsBox:IsActive()
 end
 
-local function HandleStoryOptionsAction(handler)
-    if not IsStoryOptionsShown() then return end
+local function HandleOptionsBoxAction(handler)
+    if not IsOptionsBoxShown() then return end
 
-    if handler(LWStoryOptionsBox) then
+    if handler(LWOptionsBox) then
         InputHandler.BlockKeyEvent()
         return true
     end
@@ -74,7 +74,7 @@ local function HandleConfirmAction()
         return true
     end
 
-    local result = HandleStoryOptionsAction(LWStoryOptionsBox.ConfirmSelection)
+    local result = HandleOptionsBoxAction(LWOptionsBox.ConfirmSelection)
     if result ~= nil then return result end
 
     if LWDialogFrame:ConfirmGossipSelection() or LWDialogFrame:ConfirmQuestSelection() then
@@ -86,7 +86,7 @@ local function HandleConfirmAction()
 end
 
 local function HandleCloseAction()
-    if Config.DBGlobal:GetVariable("CloseToPreviousPage") == false then
+    if IsOptionsBoxShown() or Config.DBGlobal:GetVariable("CloseToPreviousPage") == false then
         DialogFrame.RequestCloseSession()
         InputHandler.BlockKeyEvent()
         return true
@@ -96,7 +96,7 @@ local function HandleCloseAction()
 end
 
 local function HandleScrollDownAction()
-    local result = HandleStoryOptionsAction(LWStoryOptionsBox.SelectNextOption)
+    local result = HandleOptionsBoxAction(LWOptionsBox.SelectNextOption)
     if result ~= nil then return result end
 
     if LWDialogFrame.GossipFrame:IsShown() then
@@ -118,7 +118,7 @@ local function HandleScrollDownAction()
 end
 
 local function HandleScrollUpAction()
-    local result = HandleStoryOptionsAction(LWStoryOptionsBox.SelectPreviousOption)
+    local result = HandleOptionsBoxAction(LWOptionsBox.SelectPreviousOption)
     if result ~= nil then return result end
 
     if LWDialogFrame.GossipFrame:IsShown() then
@@ -140,8 +140,8 @@ local function HandleScrollUpAction()
 end
 
 local function HandleSelectDialogOptionAction(optionIndex)
-    if IsStoryOptionsShown() then
-        return LWStoryOptionsBox:SelectDialogOption(optionIndex)
+    if IsOptionsBoxShown() then
+        return LWOptionsBox:SelectDialogOption(optionIndex)
     end
 
     ControlDispatcher.pushedDialogOption = LWDialogFrame:SetDialogOptionPushed(optionIndex, true)
@@ -248,7 +248,7 @@ local function IsDialogFrameShown()
 end
 
 local function CanProcessKeyInput()
-    return not LWSettingFrame:IsShown() and (IsImmersiveModeActive() or IsStoryModeActive() or IsDialogFrameShown())
+    return not LWSettingFrame:IsShown() and (IsImmersiveModeActive() or IsStoryModeActive() or IsOptionsBoxShown() or IsDialogFrameShown())
 end
 
 local function HandleAction(actionID)
@@ -266,10 +266,10 @@ local function HandleAction(actionID)
         end
     end
 
-    if IsStoryOptionsShown() then
+    if IsOptionsBoxShown() then
         local action = DIALOG_FRAME_ACTIONS[actionID]
         if action and action.handler() then
-            return action, IsStoryOptionsShown
+            return action, IsOptionsBoxShown
         end
         return
     end

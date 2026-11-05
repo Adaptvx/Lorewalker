@@ -85,7 +85,26 @@ local function HandleRestorePositionsAccept()
     Config.DBGlobal:SetVariable("dialogFrameBounds", nil)
     Config.DBGlobal:SetVariable("immersiveChatBubbleBounds", nil)
     Config.DBGlobal:SetVariable("storyDialogBoxBounds", nil)
+    Config.DBGlobal:SetVariable("optionsBoxBounds", nil)
     ReloadUI()
+end
+
+local function HandleCameraEffectsReset()
+    for _, effectName in ipairs({
+        "Zoom",
+        "ShowVignette",
+        "PitchLimit",
+        "Fov",
+        "Pan",
+        "ShoulderOffset",
+        "HeadMovementStrength",
+        "FocusInteractTarget",
+        "FocusInteractTargetPitchStrength",
+        "FocusInteractTargetYawStrength"
+    }) do
+        Config.DBGlobal:ResetVariable("CameraEffects_" .. effectName)
+        Config.DBGlobal:ResetVariable("CameraEffects_" .. effectName .. "Enabled")
+    end
 end
 
 local RESET_PROMPT = {
@@ -126,6 +145,7 @@ do -- Schema
     local function IsKeyboardBindingDevice() return Config.DBGlobal:GetVariable("BindingDevice") == InputHandler.Enum.InputDevices.KBM end
     local function IsTextPlaybackDisabled() return not Config.DBGlobal:GetVariable("TextPlayback") end
     local function IsImmersivePlaybackDisabled() return IsTextPlaybackDisabled() or not Config.DBGlobal:GetVariable("TextPlayback_Immersive") end
+    local function IsCustomCameraEffects() return Config.DBGlobal:GetVariable("CameraEffectsPreset") == env.Enum.CameraEffectsPreset.Custom end
 
     Settings_Schema.SCHEMA = {
         {
@@ -338,9 +358,168 @@ do -- Schema
                             widgetSelectionMenu_data = {
                                 L["CONFIG_EFFECTS_CAMERA_NONE"],
                                 L["CONFIG_EFFECTS_CAMERA_FULL"],
-                                L["CONFIG_EFFECTS_CAMERA_BALANCED"]
+                                L["CONFIG_EFFECTS_CAMERA_BALANCED"],
+                                L["CONFIG_EFFECTS_CAMERA_CUSTOM"]
                             },
                             key                      = "CameraEffectsPreset"
+                        },
+                        {
+                            widgetName = L["CONFIG_EFFECTS_CAMERA_ZOOM"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "CameraEffects_ZoomEnabled",
+                            indent     = 1,
+                            showWhen   = IsCustomCameraEffects
+                        },
+                        {
+                            widgetName       = L["CONFIG_EFFECTS_CAMERA_VALUE"],
+                            widgetType       = Settings_Enum.WidgetType.Range,
+                            widgetRange_min  = 0,
+                            widgetRange_max  = 39,
+                            widgetRange_step = 1,
+                            key              = "CameraEffects_Zoom",
+                            indent           = 2,
+                            showWhen         = function() return IsCustomCameraEffects() and Config.DBGlobal:GetVariable("CameraEffects_ZoomEnabled") end
+                        },
+                        {
+                            widgetName = L["CONFIG_EFFECTS_CAMERA_PITCHLIMIT"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "CameraEffects_PitchLimitEnabled",
+                            indent     = 1,
+                            showWhen   = IsCustomCameraEffects
+                        },
+                        {
+                            widgetName       = L["CONFIG_EFFECTS_CAMERA_VALUE"],
+                            widgetType       = Settings_Enum.WidgetType.Range,
+                            widgetRange_min  = 0,
+                            widgetRange_max  = 88,
+                            widgetRange_step = 1,
+                            key              = "CameraEffects_PitchLimit",
+                            indent           = 2,
+                            showWhen         = function() return IsCustomCameraEffects() and Config.DBGlobal:GetVariable("CameraEffects_PitchLimitEnabled") end
+                        },
+                        {
+                            widgetName = L["CONFIG_EFFECTS_CAMERA_FOV"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "CameraEffects_FovEnabled",
+                            indent     = 1,
+                            showWhen   = IsCustomCameraEffects
+                        },
+                        {
+                            widgetName       = L["CONFIG_EFFECTS_CAMERA_VALUE"],
+                            widgetType       = Settings_Enum.WidgetType.Range,
+                            widgetRange_min  = 50,
+                            widgetRange_max  = 90,
+                            widgetRange_step = 1,
+                            key              = "CameraEffects_Fov",
+                            indent           = 2,
+                            showWhen         = function() return IsCustomCameraEffects() and Config.DBGlobal:GetVariable("CameraEffects_FovEnabled") end
+                        },
+                        {
+                            widgetName = L["CONFIG_EFFECTS_CAMERA_PAN"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "CameraEffects_PanEnabled",
+                            indent     = 1,
+                            showWhen   = IsCustomCameraEffects
+                        },
+                        {
+                            widgetName       = L["CONFIG_EFFECTS_CAMERA_VALUE"],
+                            widgetType       = Settings_Enum.WidgetType.Range,
+                            widgetRange_min  = -1,
+                            widgetRange_max  = 1,
+                            widgetRange_step = 0.05,
+                            key              = "CameraEffects_Pan",
+                            indent           = 2,
+                            showWhen         = function() return IsCustomCameraEffects() and Config.DBGlobal:GetVariable("CameraEffects_PanEnabled") end
+                        },
+                        {
+                            widgetName = L["CONFIG_EFFECTS_CAMERA_SHOULDEROFFSET"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "CameraEffects_ShoulderOffsetEnabled",
+                            indent     = 1,
+                            showWhen   = IsCustomCameraEffects
+                        },
+                        {
+                            widgetName       = L["CONFIG_EFFECTS_CAMERA_VALUE"],
+                            widgetType       = Settings_Enum.WidgetType.Range,
+                            widgetRange_min  = -10,
+                            widgetRange_max  = 10,
+                            widgetRange_step = 0.1,
+                            key              = "CameraEffects_ShoulderOffset",
+                            indent           = 2,
+                            showWhen         = function() return IsCustomCameraEffects() and Config.DBGlobal:GetVariable("CameraEffects_ShoulderOffsetEnabled") end
+                        },
+                        {
+                            widgetName = L["CONFIG_EFFECTS_CAMERA_HEADMOVEMENTSTRENGTH"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "CameraEffects_HeadMovementStrengthEnabled",
+                            indent     = 1,
+                            showWhen   = IsCustomCameraEffects
+                        },
+                        {
+                            widgetName       = L["CONFIG_EFFECTS_CAMERA_VALUE"],
+                            widgetType       = Settings_Enum.WidgetType.Range,
+                            widgetRange_min  = 0,
+                            widgetRange_max  = 1,
+                            widgetRange_step = 0.05,
+                            key              = "CameraEffects_HeadMovementStrength",
+                            indent           = 2,
+                            showWhen         = function() return IsCustomCameraEffects() and Config.DBGlobal:GetVariable("CameraEffects_HeadMovementStrengthEnabled") end
+                        },
+                        {
+                            widgetName = L["CONFIG_EFFECTS_CAMERA_FOCUSINTERACTTARGET"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "CameraEffects_FocusInteractTarget",
+                            indent     = 1,
+                            showWhen   = IsCustomCameraEffects
+                        },
+                        {
+                            widgetName = L["CONFIG_EFFECTS_CAMERA_FOCUSINTERACTTARGETPITCHSTRENGTH"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "CameraEffects_FocusInteractTargetPitchStrengthEnabled",
+                            indent     = 2,
+                            showWhen   = function() return IsCustomCameraEffects() and Config.DBGlobal:GetVariable("CameraEffects_FocusInteractTarget") end
+                        },
+                        {
+                            widgetName       = L["CONFIG_EFFECTS_CAMERA_VALUE"],
+                            widgetType       = Settings_Enum.WidgetType.Range,
+                            widgetRange_min  = 0,
+                            widgetRange_max  = 1,
+                            widgetRange_step = 0.05,
+                            key              = "CameraEffects_FocusInteractTargetPitchStrength",
+                            indent           = 3,
+                            showWhen         = function() return IsCustomCameraEffects() and Config.DBGlobal:GetVariable("CameraEffects_FocusInteractTarget") and Config.DBGlobal:GetVariable("CameraEffects_FocusInteractTargetPitchStrengthEnabled") end
+                        },
+                        {
+                            widgetName = L["CONFIG_EFFECTS_CAMERA_FOCUSINTERACTTARGETYAWSTRENGTH"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "CameraEffects_FocusInteractTargetYawStrengthEnabled",
+                            indent     = 2,
+                            showWhen   = function() return IsCustomCameraEffects() and Config.DBGlobal:GetVariable("CameraEffects_FocusInteractTarget") end
+                        },
+                        {
+                            widgetName       = L["CONFIG_EFFECTS_CAMERA_VALUE"],
+                            widgetType       = Settings_Enum.WidgetType.Range,
+                            widgetRange_min  = 0,
+                            widgetRange_max  = 1,
+                            widgetRange_step = 0.05,
+                            key              = "CameraEffects_FocusInteractTargetYawStrength",
+                            indent           = 3,
+                            showWhen         = function() return IsCustomCameraEffects() and Config.DBGlobal:GetVariable("CameraEffects_FocusInteractTarget") and Config.DBGlobal:GetVariable("CameraEffects_FocusInteractTargetYawStrengthEnabled") end
+                        },
+                        {
+                            widgetName = L["CONFIG_EFFECTS_CAMERA_SHOWVIGNETTE"],
+                            widgetType = Settings_Enum.WidgetType.CheckButton,
+                            key        = "CameraEffects_ShowVignette",
+                            indent     = 1,
+                            showWhen   = IsCustomCameraEffects
+                        },
+                        {
+                            widgetType                  = Settings_Enum.WidgetType.Button,
+                            widgetButton_text           = L["CONFIG_EFFECTS_CAMERA_RESET"],
+                            widgetButton_refreshOnClick = true,
+                            set                         = HandleCameraEffectsReset,
+                            indent                      = 1,
+                            showWhen                    = IsCustomCameraEffects
                         }
                     }
                 }
@@ -528,6 +707,15 @@ do -- Schema
                     showWhen   = function() return Config.DBGlobal:GetVariable("ActiveMode") == env.Enum.Mode.Immersive end,
                     children   = {
                         {
+                            widgetName               = L["CONFIG_APPEARANCE_IMMERSIVE_OPTIONSTYLE"],
+                            widgetType               = Settings_Enum.WidgetType.SelectionMenu,
+                            widgetSelectionMenu_data = {
+                                L["CONFIG_APPEARANCE_IMMERSIVE_OPTIONSTYLE_DIALOGFRAME"],
+                                L["CONFIG_APPEARANCE_IMMERSIVE_OPTIONSTYLE_STANDALONE"]
+                            },
+                            key                      = "ImmersiveOptionsBoxStyle"
+                        },
+                        {
                             widgetName                     = L["CONFIG_APPEARANCE_IMMERSIVE_FONTSIZE"],
                             widgetType                     = Settings_Enum.WidgetType.Range,
                             widgetRange_min                = 0.8,
@@ -588,6 +776,12 @@ do -- Schema
                             widgetName        = L["CONTRIBUTORS_BRAINC3LL"],
                             widgetType        = Settings_Enum.WidgetType.Text,
                             widgetDescription = Settings_Define.Descriptor{ description = L["CONTRIBUTORS_BRAINC3LL_DESCRIPTION"] },
+                            widgetTransparent = true
+                        },
+                        {
+                            widgetName        = L["CONTRIBUTORS_CATHTAIL"],
+                            widgetType        = Settings_Enum.WidgetType.Text,
+                            widgetDescription = Settings_Define.Descriptor{ description = L["CONTRIBUTORS_CATHTAIL_DESCRIPTION"] },
                             widgetTransparent = true
                         },
                         {

@@ -11,8 +11,8 @@ local WoWClient = env.modules:Import("packages\\wow-client")
 env.NAME = "Lorewalker"
 env.ICON = Path.Root .. "\\Art\\Icons\\Logo"
 env.ICON_ALT = Path.Root .. "\\Art\\Icons\\Logo-White"
-env.VERSION_STRING = "Beta 8"
-env.VERSION_NUMBER = 000008
+env.VERSION_STRING = "Beta 9"
+env.VERSION_NUMBER = 000009
 env.DEBUG_MODE = false
 
 
@@ -28,6 +28,10 @@ do
     Enum.FrameTheme = {
         Default = 1,
         Forever = 2
+    }
+    Enum.OptionsBoxStyle = {
+        DialogFrame = 1,
+        OptionsBox  = 2
     }
     Enum.Mode = {
         Classic   = 1,
@@ -156,6 +160,11 @@ do
             x = nil,
             y = nil,
         },
+        optionsBoxBounds = {
+            point = nil,
+            x = nil,
+            y = nil,
+        },
         userKeybinds = {},
 
         Theme                                              = Enum.Theme.Light,
@@ -165,21 +174,30 @@ do
 
         DialogFontSizeOffset                               = 1, --100%
         ChatBubbleFontSizeOffset                           = 1, --100%
+        ImmersiveOptionsBoxStyle                           = Enum.OptionsBoxStyle.DialogFrame,
         LockFramePositions                                 = false,
         ConfirmUseInteractKey                              = false,
 
         HideUI                                             = false,
         CameraEffectsPreset                                = Enum.CameraEffectsPreset.None,
-        CameraEffects_Zoom                                 = nil,
-        CameraEffects_ShowVignette                         = nil,
-        CameraEffects_PitchLimit                           = nil,
-        CameraEffects_Fov                                  = nil,
-        CameraEffects_Pan                                  = nil,
-        CameraEffects_ShoulderOffset                       = nil,
-        CameraEffects_HeadMovementStrength                 = nil,
-        CameraEffects_FocusInteractTarget                  = nil,
-        CameraEffects_FocusInteractTargetPitchStrength     = nil,
-        CameraEffects_FocusInteractTargetYawStrength       = nil,
+        CameraEffects_Zoom                                 = 5,
+        CameraEffects_ShowVignette                         = false,
+        CameraEffects_PitchLimit                           = 15,
+        CameraEffects_Fov                                  = 60,
+        CameraEffects_Pan                                  = 0,
+        CameraEffects_ShoulderOffset                       = 1.5,
+        CameraEffects_HeadMovementStrength                 = 1,
+        CameraEffects_FocusInteractTarget                  = false,
+        CameraEffects_FocusInteractTargetPitchStrength     = 0.5,
+        CameraEffects_FocusInteractTargetYawStrength       = 0.5,
+        CameraEffects_ZoomEnabled                          = false,
+        CameraEffects_PitchLimitEnabled                    = false,
+        CameraEffects_FovEnabled                           = false,
+        CameraEffects_PanEnabled                           = false,
+        CameraEffects_ShoulderOffsetEnabled                = false,
+        CameraEffects_HeadMovementStrengthEnabled          = false,
+        CameraEffects_FocusInteractTargetPitchStrengthEnabled = false,
+        CameraEffects_FocusInteractTargetYawStrengthEnabled = false,
 
         TextPlayback                                       = false,
         TextPlayback_Classic                               = true,

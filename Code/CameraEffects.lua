@@ -148,6 +148,7 @@ CameraEffects.Presets = {
 
 CameraEffects.Enabled = false
 CameraEffects.SessionOptions = {}
+local isSessionActive = false
 
 
 if GameEvent and GameEvent.UnregisterInternalEvent then GameEvent.UnregisterInternalEvent("EXPERIMENTAL_CVAR_CONFIRMATION_NEEDED") end
@@ -160,6 +161,8 @@ if not validCameraViews[tonumber(GetCVar("cameraView"))] then SetCVar("cameraVie
 
 
 function CameraEffects.LoadOptions()
+    if isSessionActive then return end
+
     local preset = Config.DBGlobal:GetVariable("CameraEffectsPreset")
     CameraEffects.Enabled = preset ~= env.Enum.CameraEffectsPreset.None
 
@@ -167,7 +170,10 @@ function CameraEffects.LoadOptions()
 
     if preset == env.Enum.CameraEffectsPreset.Custom then
         for effectName, effect in pairs(CameraEffects.Enum.Effects) do
-            CameraEffects.SessionOptions[effect] = Config.DBGlobal:GetVariable("CameraEffects_" .. effectName)
+            local enabled = Config.DBGlobal:GetVariable("CameraEffects_" .. effectName .. "Enabled")
+            if enabled or effectName == "ShowVignette" or effectName == "FocusInteractTarget" then
+                CameraEffects.SessionOptions[effect] = Config.DBGlobal:GetVariable("CameraEffects_" .. effectName)
+            end
         end
         return
     end
@@ -184,6 +190,7 @@ CallbackRegistry.Add("Preload.DatabaseReady", CameraEffects.LoadOptions)
 SavedVariables.OnChange("LorewalkerDB_Global", "CameraEffectsPreset", CameraEffects.LoadOptions)
 for effectName in pairs(CameraEffects.Enum.Effects) do
     SavedVariables.OnChange("LorewalkerDB_Global", "CameraEffects_" .. effectName, CameraEffects.LoadOptions)
+    SavedVariables.OnChange("LorewalkerDB_Global", "CameraEffects_" .. effectName .. "Enabled", CameraEffects.LoadOptions)
 end
 
 
@@ -403,7 +410,6 @@ CameraUtil:SetScript("OnEvent", CameraUtil.OnEvent)
 
 
 
-local isSessionActive = false
 local sessionID = 0
 local ShoulderOffsetUtil = CreateFrame("Frame")
 local ShoulderOffsetStartTimer = LazyTimer.New()
@@ -556,7 +562,7 @@ function CameraEffects.OnSessionBegin()
     disableFov = CameraUtil.isSkyriding
 
     if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.PitchLimit] then
-        CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.PitchLimit, 88, CameraEffects.SessionOptions[CameraEffects.Enum.Effects.PitchLimit], 1.75, UIAnim.Enum.Easing.SineInOut, CameraUtil.RestorePitchLimit)
+        CameraUtil:InterpolateCVar(CameraEffects.Enum.Effects.PitchLimit, 88, CameraEffects.SessionOptions[CameraEffects.Enum.Effects.PitchLimit], 1.75, UIAnim.Enum.Easing.SineInOut)
     end
     if CameraEffects.SessionOptions[CameraEffects.Enum.Effects.ShowVignette] then
         LWVignette:FadeIn()
@@ -628,6 +634,7 @@ function CameraEffects.OnSessionEnd()
 
     CameraUtil:RestorePitchLimit()
     CameraUtil:ReleaseSnapshotWhenIdle()
+    CameraEffects.LoadOptions()
 end
 
 CallbackRegistry.Add("ControlCenter.SessionBegin", CameraEffects.OnSessionBegin)

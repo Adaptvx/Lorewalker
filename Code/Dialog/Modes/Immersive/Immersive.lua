@@ -2,6 +2,7 @@ local env = select(2, ...)
 local Config = env.Config
 local Sound = env.modules:Import("packages\\sound")
 local CallbackRegistry = env.modules:Import("packages\\callback-registry")
+local SavedVariables = env.modules:Import("packages\\saved-variables")
 local UIAnim = env.modules:Import("packages\\ui-anim")
 local Utils_Blizzard = env.modules:Import("packages\\utils\\blizzard")
 local Dialog_Preload = env.modules:Import("@\\Dialog\\Preload")
@@ -9,6 +10,7 @@ local SharedUtil = env.modules:Import("@\\Dialog\\SharedUtil")
 local TextPlaybackUtil = env.modules:Import("@\\Dialog\\TextPlaybackUtil")
 local ControlCenter = env.modules:Import("@\\Dialog\\ControlCenter")
 local DialogFrame = env.modules:Import("@\\Dialog\\DialogFrame")
+local OptionsBox = env.modules:Import("@\\Dialog\\OptionsBox")
 local Modes_ModeHandler = env.modules:Import("@\\Dialog\\Modes\\ModeHandler")
 local ImmersiveMode_Preload = env.modules:Import("@\\Dialog\\Modes\\Immersive\\Preload")
 local Dialog_CVars = env.modules:Import("@\\Dialog\\CVars")
@@ -122,6 +124,7 @@ end
 function ImmersiveMode.Deactivate()
     ImmersiveMode.isActive = false
     Dialog_CVars.Deactivate(Dialog_CVars.Profiles.ImmersiveMode)
+    LWOptionsBox:CloseImmediately()
     LWDialogFrame:Close()
     LWImmersiveChatBubble:RestoreNameplate()
     LWImmersiveChatBubble:Close()
@@ -147,6 +150,7 @@ function ImmersiveMode.OnSessionEnd()
     Dialog_CVars.Deactivate(Dialog_CVars.Profiles.ImmersiveMode)
     LWImmersiveChatBubble:CloseImmediately()
     LWImmersiveChatBubble:RestoreNameplate()
+    LWOptionsBox:CloseImmediately()
     LWDialogFrame:HideQuestModelFrame()
     LWDialogFrame:Close()
 end
@@ -156,21 +160,33 @@ function ImmersiveMode.OnCombatBegin()
     Dialog_CVars.Deactivate(Dialog_CVars.Profiles.ImmersiveMode)
 end
 
+local function ShowGossipOptions()
+    LWDialogFrame:HideQuestModelFrame()
+    if Config.DBGlobal:GetVariable("ImmersiveOptionsBoxStyle") == env.Enum.OptionsBoxStyle.OptionsBox then
+        LWDialogFrame:Close(true)
+        LWOptionsBox:RefreshOptions()
+        LWOptionsBox:Open()
+    else
+        LWOptionsBox:CloseImmediately()
+        LWDialogFrame:RefreshGossipFrame()
+        LWDialogFrame:Open()
+        LWDialogFrame.GossipFrame.ScrollContainer:SetVerticalScroll(0, true)
+        LWDialogFrame.GossipFrame:_Render()
+        LWDialogFrame:RefreshEdgeFade()
+    end
+end
+
 function ImmersiveMode.OnShowGossip()
     if not ImmersiveMode.isActive then return end
 
     LWImmersiveChatBubble:UpdateChatBubble(true)
-    LWDialogFrame:HideQuestModelFrame()
-    LWDialogFrame:RefreshGossipFrame()
-    LWDialogFrame:Open()
-    LWDialogFrame.GossipFrame.ScrollContainer:SetVerticalScroll(0, true)
-    LWDialogFrame.GossipFrame:_Render()
-    LWDialogFrame:RefreshEdgeFade()
+    ShowGossipOptions()
 end
 
 function ImmersiveMode.OnHideGossip(_, interactionIsContinuing)
     if not ImmersiveMode.isActive then return end
     LWImmersiveChatBubble:Close()
+    LWOptionsBox:CloseImmediately()
     LWDialogFrame:Close(interactionIsContinuing)
 end
 
@@ -178,13 +194,18 @@ function ImmersiveMode.OnUpdateGossip()
     if not ImmersiveMode.isActive then return end
     LWImmersiveChatBubble:UpdateChatBubble()
     if not ControlCenter.IsGossipValidForUpdate() then return end
-    LWDialogFrame:UpdateGossipQuestOptions()
+    if Config.DBGlobal:GetVariable("ImmersiveOptionsBoxStyle") == env.Enum.OptionsBoxStyle.OptionsBox then
+        LWOptionsBox:RefreshOptions()
+    else
+        LWDialogFrame:UpdateGossipQuestOptions()
+    end
 end
 
 function ImmersiveMode.OnShowQuest()
     if not ImmersiveMode.isActive then return end
 
     LWImmersiveChatBubble:UpdateChatBubble(true)
+    LWOptionsBox:CloseImmediately()
     LWDialogFrame:RefreshQuestFrame()
     LWDialogFrame:RefreshQuestModelFrame()
     LWDialogFrame:Open()
@@ -228,7 +249,11 @@ end
 
 function ImmersiveMode.OnGossipOptionSelectionRequested(_, optionType, optionKey)
     if not ImmersiveMode.isActive then return end
-    ControlCenter.SelectGossipOption(optionType, optionKey)
+    if optionType == OptionsBox.Enum.OptionType.Goodbye then
+        CloseSession()
+    else
+        ControlCenter.SelectGossipOption(optionType, optionKey)
+    end
 end
 
 function ImmersiveMode.OnQuestRewardSelectionRequested(_, rewardIndex)
@@ -866,6 +891,11 @@ CallbackRegistry.Add(DialogFrame.Events.CloseSessionRequested, ImmersiveMode.OnC
 CallbackRegistry.Add(DialogFrame.Events.ActionRequested, ImmersiveMode.OnActionRequested)
 CallbackRegistry.Add(DialogFrame.Events.GossipOptionSelectionRequested, ImmersiveMode.OnGossipOptionSelectionRequested)
 CallbackRegistry.Add(DialogFrame.Events.QuestRewardSelectionRequested, ImmersiveMode.OnQuestRewardSelectionRequested)
+SavedVariables.OnChange("LorewalkerDB_Global", "ImmersiveOptionsBoxStyle", function()
+    if ImmersiveMode.isActive and ControlCenter.GetGossipSessionType() then
+        ShowGossipOptions()
+    end
+end)
 
 
 Modes_ModeHandler.RegisterMode(env.Enum.Mode.Immersive, ImmersiveMode)

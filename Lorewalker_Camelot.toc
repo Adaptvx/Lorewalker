@@ -1,5 +1,5 @@
 ## Interface: 16001
-## Version: 0.0.8 (Beta 8)
+## Version: 0.0.9 (Beta 9)
 ## Title: Lorewalker
 ## Notes: A modern questing experience.
 ## Author: AdaptiveX
@@ -22,6 +22,7 @@ Code\HideUI.lua
 Code\CameraEffects.lua
 Code\UI\UI.xml
 
+Code\TextToSpeech\TextToSpeech.xml
 Code\Dialog\Dialog.xml
 Code\Settings\Settings.xml
 Code\ControlDispatcher.lua

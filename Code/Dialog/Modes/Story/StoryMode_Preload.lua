@@ -16,7 +16,6 @@ StoryMode_Preload.Enum = {
 local ATLAS = UIKit.Define.Texture_Atlas{ path = Path.Root .. "\\Art\\Dialog\\StoryMode\\StoryModeFrame" }
 Utils_Texture.Preload(Path.Root .. "\\Art\\Dialog\\StoryMode\\StoryModeFrame")
 StoryMode_Preload.UIDEF = {
-    UIOptionsBoxShadow             = ATLAS{ inset = 47, scale = 5, left = 8 / 512, right = 104 / 512, top = 167 / 512, bottom = 263 / 512, sliceMode = Enum.UITextureSliceMode.Stretched },
     UIDialogBoxDivider             = ATLAS{ inset = 0, left = 7 / 512, right = 58 / 512, top = 7 / 512, bottom = 19 / 512, sliceMode = Enum.UITextureSliceMode.Stretched },
     UIDialogBoxDividerOrnament     = ATLAS{ left = 63 / 512, right = 75 / 512, top = 7 / 512, bottom = 19 / 512 },
     UIDialogBoxDividerSectionLeft  = ATLAS{ inset = { 0, 12, 0, 0 }, left = 80 / 512, right = 111 / 512, top = 7 / 512, bottom = 19 / 512 },

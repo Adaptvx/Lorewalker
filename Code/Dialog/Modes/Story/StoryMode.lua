@@ -1,12 +1,10 @@
 local env = select(2, ...)
-local L = env.L
 local Config = env.Config
 local CallbackRegistry = env.modules:Import("packages\\callback-registry")
-local SavedVariables = env.modules:Import("packages\\saved-variables")
 local UIAnim = env.modules:Import("packages\\ui-anim")
 local ControlCenter = env.modules:Import("@\\Dialog\\ControlCenter")
-local ControlCenter_ContextIcon = env.modules:Import("@\\Dialog\\ControlCenter\\ContextIcon")
 local DialogFrame = env.modules:Import("@\\Dialog\\DialogFrame")
+local OptionsBox = env.modules:Import("@\\Dialog\\OptionsBox")
 local SharedUtil = env.modules:Import("@\\Dialog\\SharedUtil")
 local TextPlaybackUtil = env.modules:Import("@\\Dialog\\TextPlaybackUtil")
 local Modes_ModeHandler = env.modules:Import("@\\Dialog\\Modes\\ModeHandler")
@@ -14,18 +12,7 @@ local StoryMode_Preload = env.modules:Import("@\\Dialog\\Modes\\Story\\Preload")
 local StoryMode = env.modules:New("@\\Dialog\\Modes\\StoryMode")
 
 local Mixin = Mixin
-local ipairs = ipairs
-local wipe = wipe
 local gsub = string.gsub
-local max = math.max
-local min = math.min
-
-local GOODBYE_OPTION = {
-    name = L["GOODBYE"],
-    contextIcon = ControlCenter_ContextIcon.TexDef.GossipExit.path,
-    optionType = "Goodbye",
-    optionKey = 0
-}
 
 
 StoryMode.isActive = false
@@ -60,13 +47,13 @@ local function ShowGossipOptions()
     LWStoryDialogBox:SetArrowShown(false)
     LWDialogFrame:HideQuestModelFrame()
     LWDialogFrame:Close(true)
-    LWStoryOptionsBox:RefreshOptions()
-    LWStoryOptionsBox:Open()
+    LWOptionsBox:RefreshOptions()
+    LWOptionsBox:Open()
 end
 
 local function ShowQuestState()
     StoryMode.state = StoryMode_Preload.Enum.PlaybackState.Quest
-    LWStoryOptionsBox:CloseImmediately()
+    LWOptionsBox:CloseImmediately()
     LWStoryDialogBox:SetArrowShown(false)
     LWStoryDialogBox:Close()
     LWDialogFrame:RefreshQuestFrame()
@@ -89,7 +76,7 @@ end
 
 local function ShowDialogue(text, dividerText)
     if not LWStoryDialogBox.isLoaded then return end
-    LWStoryOptionsBox:CloseImmediately()
+    LWOptionsBox:CloseImmediately()
 
     local npcGUID = ControlCenter.GetNPCGUID()
     if StoryMode.npcGUID ~= npcGUID then
@@ -120,7 +107,7 @@ local function Refresh()
     else
         StoryMode.state = nil
         LWStoryDialogBox:Close()
-        LWStoryOptionsBox:Close()
+        LWOptionsBox:Close()
         LWDialogFrame:HideQuestModelFrame()
         LWDialogFrame:Close()
     end
@@ -137,7 +124,7 @@ function StoryMode.Deactivate()
     StoryMode.state = nil
     StoryMode.npcGUID = nil
     LWStoryDialogBox:Close()
-    LWStoryOptionsBox:CloseImmediately()
+    LWOptionsBox:CloseImmediately()
     LWDialogFrame:HideQuestModelFrame()
     LWDialogFrame:Close()
 end
@@ -152,7 +139,7 @@ function StoryMode.OnSessionEnd()
     StoryMode.state = nil
     StoryMode.npcGUID = nil
     LWStoryDialogBox:CloseImmediately()
-    LWStoryOptionsBox:CloseImmediately()
+    LWOptionsBox:CloseImmediately()
     LWDialogFrame:HideQuestModelFrame()
     LWDialogFrame:Close()
 end
@@ -164,7 +151,7 @@ end
 
 function StoryMode.OnHideGossip(_, interactionIsContinuing)
     if not StoryMode.isActive then return end
-    LWStoryOptionsBox:CloseImmediately()
+    LWOptionsBox:CloseImmediately()
     LWDialogFrame:Close(interactionIsContinuing)
 
     if not interactionIsContinuing then
@@ -185,8 +172,8 @@ function StoryMode.OnUpdateGossip()
 
     if StoryMode.state ~= StoryMode_Preload.Enum.PlaybackState.Options then return end
     if not ControlCenter.IsGossipValidForUpdate() then return end
-    LWStoryOptionsBox:RefreshOptions()
-    LWStoryOptionsBox:Open()
+    LWOptionsBox:RefreshOptions()
+    LWOptionsBox:Open()
 end
 
 function StoryMode.OnShowQuest()
@@ -198,7 +185,7 @@ function StoryMode.OnHideQuest()
     if not StoryMode.isActive then return end
     StoryMode.state = nil
     LWStoryDialogBox:Close()
-    LWStoryOptionsBox:CloseImmediately()
+    LWOptionsBox:CloseImmediately()
     LWDialogFrame:HideQuestModelFrame()
     LWDialogFrame:Close()
 end
@@ -231,7 +218,7 @@ end
 
 function StoryMode.OnGossipOptionSelectionRequested(_, optionType, optionKey)
     if not StoryMode.isActive or StoryMode.state ~= StoryMode_Preload.Enum.PlaybackState.Options then return end
-    if optionType == GOODBYE_OPTION.optionType then
+    if optionType == OptionsBox.Enum.OptionType.Goodbye then
         CloseSession()
     else
         ControlCenter.SelectGossipOption(optionType, optionKey)
@@ -540,204 +527,8 @@ end
 Mixin(LWStoryDialogBox, StoryDialogBoxMixin)
 
 
-local StoryOptionsBoxMixin = {}
-
-function StoryOptionsBoxMixin:OnLoad()
-    self.isLoaded = true
-    self.options = {}
-    self.selectedIndex = nil
-    self.selectedElement = nil
-    self.isSelectingOption = false
-
-    self.HitRect:AddOnMouseUp(function(button)
-        if button == "RightButton" and Config.DBGlobal:GetVariable("RightClickToClose") then
-            CloseSession()
-        end
-    end)
-    SharedUtil.InitializeBoundsForFrame(self, "storyOptionsBoxBounds", self.HitRect, 2)
-
-    CallbackRegistry.Add("InputHandler.InputDeviceChanged", function()
-        if self:IsActive() then self:RefreshOptions() end
-    end)
-    SavedVariables.OnChange("LorewalkerDB_Global", "ShowQuestLevel", function()
-        if self:IsActive() then self:RefreshOptions() end
-    end)
-    CallbackRegistry.Add("WoWClient.OnUIScaleChanged", function()
-        if self:IsVisible() then
-            self:_Render()
-        end
-    end)
-
-    self:RestorePosition()
-    self:Hide()
-end
-
-function StoryOptionsBoxMixin:IsActive()
-    return StoryMode.isActive and StoryMode.state == StoryMode_Preload.Enum.PlaybackState.Options and self:IsShown() and not self.AnimGroup:IsPlaying(self, "HIDE")
-end
-
-function StoryOptionsBoxMixin:RestorePosition()
-    SharedUtil.RestoreBounds(self)
-end
-
-function StoryOptionsBoxMixin:GetDefaultPosition(index)
-    local point = index == 2 and "LEFT" or "RIGHT"
-    local x = UIParent:GetWidth() * 0.09
-
-    if index ~= 2 then x = -x end
-    return point, UIParent, point, x, 0
-end
-
-function StoryOptionsBoxMixin:SetDefaultPosition(index)
-    local point, relativeTo, relativePoint, x, y = self:GetDefaultPosition(index)
-    self:ClearAllPoints()
-    self:SetPoint(point, relativeTo, relativePoint, x, y)
-end
-
-function StoryOptionsBoxMixin:ResetSelection()
-    if self.selectedElement then self.selectedElement:OnLeave() end
-    self.selectedIndex = nil
-    self.selectedElement = nil
-end
-
-function StoryOptionsBoxMixin:SetSelection(index)
-    local option = self.options[index]
-    if not option then return false end
-
-    self:ResetSelection()
-    self.selectedIndex = index
-    self.selectedElement = self.OptionsList:GetElement(index, "Default")
-    self.selectedElement:OnEnter()
-    return true
-end
-
-function StoryOptionsBoxMixin:RefreshOptions()
-    if not self.isLoaded or not ControlCenter.GetGossipSessionType() then return end
-
-    self.isSelectingOption = false
-    local selectedOption = self.selectedIndex and self.options[self.selectedIndex]
-    local selectedType = selectedOption and selectedOption.optionType
-    local selectedKey = selectedOption and selectedOption.optionKey
-    self:ResetSelection()
-    wipe(self.options)
-
-    for _, option in ipairs(ControlCenter.GetGossipOptionsQuestQuest()) do
-        self.options[#self.options + 1] = option
-    end
-    for _, option in ipairs(ControlCenter.GetGossipOptions()) do
-        self.options[#self.options + 1] = option
-    end
-    self.options[#self.options + 1] = GOODBYE_OPTION
-    for index, option in ipairs(self.options) do
-        option.dialogOptionIndex = index <= 9 and index or nil
-    end
-
-    self.OptionsList:SetData(self.options)
-    self:_Render()
-
-    if selectedKey then
-        for index, option in ipairs(self.options) do
-            if option.optionType == selectedType and option.optionKey == selectedKey then
-                self:SetSelection(index)
-                break
-            end
-        end
-    end
-
-    if #self.options == 0 then self:Close() end
-end
-
-function StoryOptionsBoxMixin:SelectNextOption()
-    if not self:IsActive() then return false end
-    local index = self.selectedIndex and min(self.selectedIndex + 1, #self.options) or 1
-    return self:SetSelection(index)
-end
-
-function StoryOptionsBoxMixin:SelectPreviousOption()
-    if not self:IsActive() then return false end
-    local index = self.selectedIndex and max(self.selectedIndex - 1, 1) or #self.options
-    return self:SetSelection(index)
-end
-
-function StoryOptionsBoxMixin:ConfirmSelection()
-    if not self:IsActive() then return false end
-    if self.isSelectingOption then return true end
-    if not self.selectedElement then return false end
-    self.selectedElement:OnClick()
-    return true
-end
-
-function StoryOptionsBoxMixin:SelectDialogOption(optionIndex)
-    if not self:IsActive() then return false end
-    if self.isSelectingOption then return true end
-
-    local option = self.options[optionIndex]
-    if not option then return false end
-    local element = self.OptionsList:GetElement(optionIndex, "Default")
-
-    self.isSelectingOption = true
-    element:PlayPushedAnimation(function()
-        self.isSelectingOption = false
-        if not self:IsActive() or self.options[optionIndex] ~= option then return end
-        DialogFrame.RequestGossipOptionSelection(option.optionType, option.optionKey)
-    end)
-    return true
-end
-
-function StoryOptionsBoxMixin:Open()
-    if not self.isLoaded or #self.options == 0 then return end
-    local wasShown = self:IsShown()
-    self:Show()
-    self.AnimGroup:Stop()
-
-    if wasShown then
-        self:SetAlpha(1)
-    else
-        self.AnimGroup:Play(self, "SHOW")
-    end
-end
-
-function StoryOptionsBoxMixin:Close()
-    self.isSelectingOption = false
-    self:ResetSelection()
-    if not self:IsShown() or self.AnimGroup:IsPlaying(self, "HIDE") then return end
-    self.AnimGroup:Stop()
-    self.AnimGroup:Play(self, "HIDE"):onFinish(function() self:Hide() end)
-end
-
-function StoryOptionsBoxMixin:CloseImmediately()
-    self.isSelectingOption = false
-    self:ResetSelection()
-    self.AnimGroup:Stop()
-    self:Hide()
-end
-
-StoryOptionsBoxMixin.AnimGroup = UIAnim.New()
-do
-    local FadeIn = UIAnim.Animate():property(UIAnim.Enum.Property.Alpha):duration(0.25):from(0):to(1)
-    local OptionFadeIn = UIAnim.Animate():property(UIAnim.Enum.Property.Alpha):duration(0.5):from(0):to(1)
-    local OptionMoveIn = UIAnim.Animate():property(UIAnim.Enum.Property.PosY):easing(UIAnim.Enum.Easing.SineOut):duration(0.5):from(-5):to(0)
-    StoryOptionsBoxMixin.AnimGroup:State("SHOW", function(frame)
-        FadeIn:Play(frame)
-        for index = 1, #frame.options do
-            local element = frame.OptionsList:GetElement(index, "Default")
-            local delay = (index - 1) * 0.05
-            element:SetAlpha(0)
-            OptionFadeIn:wait(delay):Play(element)
-            OptionMoveIn:wait(delay):Play(element.ContainerFrame)
-        end
-    end)
-
-    local FadeOut = UIAnim.Animate():property(UIAnim.Enum.Property.Alpha):duration(0.125):to(0)
-    StoryOptionsBoxMixin.AnimGroup:State("HIDE", function(frame)
-        FadeOut:Play(frame)
-    end)
-end
-
-Mixin(LWStoryOptionsBox, StoryOptionsBoxMixin)
 CallbackRegistry.Add("Preload.AddonReady", function()
     LWStoryDialogBox:OnLoad()
-    LWStoryOptionsBox:OnLoad()
     if StoryMode.isActive then Refresh() end
 end)
 

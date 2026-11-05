@@ -53,7 +53,7 @@ do -- Option
 
         ControlCenter_DataProvider.RequestQuestPreviewData(questInfo.questID)
 
-        if Config.DBGlobal:GetVariable("ActiveMode") == env.Enum.Mode.Story then
+        if LWOptionsBox:IsActive() then
             GameTooltip_SetDefaultAnchor(GameTooltip, self)
         else
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")

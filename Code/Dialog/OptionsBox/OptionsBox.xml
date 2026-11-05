@@ -1,0 +1,5 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Script file="OptionsBox_Preload.lua"/>
+    <Script file="OptionsBox_UI.lua"/>
+    <Script file="OptionsBox.lua"/>
+</Ui>
